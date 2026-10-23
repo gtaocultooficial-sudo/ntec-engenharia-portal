@@ -3,6 +3,9 @@ name: Deploy NTEC portal to GitHub Pages
 on:
   push:
     branches: [main]
+    paths:
+      - '.github/workflows/pages.yml'
+      - '.deploy-trigger'
   workflow_dispatch:
 
 permissions:
