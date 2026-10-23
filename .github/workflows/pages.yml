@@ -34,7 +34,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode site-payload.zip.b64 > /tmp/ntec-site.zip
+          cat payload/part*.b64 > /tmp/ntec-site.b64
+          base64 --decode /tmp/ntec-site.b64 > /tmp/ntec-site.zip
           unzip -t /tmp/ntec-site.zip
           mkdir -p _site
           unzip -oq /tmp/ntec-site.zip -d _site
