@@ -69,7 +69,7 @@ replacement = r"""function printNtecReport(id){
   const head=columns.map(col=>isPress&&/carga\s*\(kN\)/i.test(String(col))?String(col).replace(/\(kN\)/i,'(tf)'):String(col));
   const body=rows.map(row=>{
     while(row.length<head.length)row.push('');
-    return '<tr>'+row.slice(0,head.length).map(cell=>'<td>'+escVal(fmtDate(cell))+'</td>').join('')+'</tr>';
+    return '<tr>'+row.slice(0,head.length).map(cell=>String(cell||'').trim()?'<td>'+esc(fmtDate(cell))+'</td>':'<td></td>').join('')+'</tr>';
   }).join('');
   const className=head.length>=10?'n-results n-results-wide':'n-results';
   return '<div class="n-section-title n-table-title">'+esc(label||'RESULTADOS DO ENSAIO')+'</div><table class="'+className+'"><thead><tr>'+head.map(col=>'<th>'+esc(col)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table>';
