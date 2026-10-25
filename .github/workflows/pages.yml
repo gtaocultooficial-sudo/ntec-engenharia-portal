@@ -8,6 +8,7 @@ on:
       - '.deploy-trigger'
       - 'apply_ntec_report_features.py'
       - 'apply_ntec_pdf_layout.py'
+      - 'apply_ntec_rupture_workflow.py'
   workflow_dispatch:
 
 permissions:
@@ -50,12 +51,16 @@ jobs:
           cp recuperar-acesso.html _site/recuperar-acesso.html
           cp atualizar-senha.html _site/atualizar-senha.html
           python3 apply_ntec_report_features.py _site/admin/index.html
+          python3 apply_ntec_rupture_workflow.py _site/admin/index.html
           python3 apply_ntec_pdf_layout.py _site/admin/index.html
           grep -q "updateReportTitleAuto" _site/admin/index.html
           grep -q "ntecRecalc" _site/admin/index.html
           grep -q "ntecGenerateNarrative" _site/admin/index.html
           grep -q "Referências normativas sugeridas no modelo" _site/admin/index.html
           grep -q "report_number" _site/admin/index.html
+          grep -q "Lançar ruptura" _site/admin/index.html
+          grep -q "async updateReportResults" _site/admin/index.html
+          grep -q "CURVA DE CRESCIMENTO DA RESISTÊNCIA À COMPRESSÃO" _site/admin/index.html
           grep -q "size:A4 portrait" _site/admin/index.html
           grep -q "DADOS DO CLIENTE / OBRA" _site/admin/index.html
           grep -q "NTEC ENGENHARIA &amp; GEOTECNIA" _site/admin/index.html
