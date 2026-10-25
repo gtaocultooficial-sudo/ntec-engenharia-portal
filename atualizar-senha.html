@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nova senha | NTEC</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#10263f;background:#eef3f8}*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:20px}.card{width:min(440px,100%);background:white;border-radius:18px;padding:30px;box-shadow:0 18px 50px #10263f20}h1{font-size:24px;margin:0 0 8px}p{color:#5b6c7e;line-height:1.55;font-size:14px}label{display:block;font-weight:700;font-size:13px;margin:18px 0 7px}input,button{width:100%;padding:13px;border-radius:9px;font:inherit}input{border:1px solid #ccd6e0}button{margin-top:14px;border:0;background:#10263f;color:white;font-weight:700;cursor:pointer}button:disabled{opacity:.6}.msg{font-size:13px;min-height:20px;margin-top:12px;overflow-wrap:anywhere}.back{display:block;margin-top:18px;color:#1f5f91;font-size:14px}
+</style>
+</head>
+<body><main class="card">
+<h1>Criar nova senha</h1>
+<p>Defina uma senha nova para acessar o portal NTEC. Use pelo menos 8 caracteres.</p>
+<form id="password-form"><label for="password">Nova senha</label><input id="password" type="password" autocomplete="new-password" minlength="8" required><label for="confirm">Confirmar nova senha</label><input id="confirm" type="password" autocomplete="new-password" minlength="8" required><button id="save" type="submit">Salvar nova senha</button></form>
+<div class="msg" id="message" role="status" aria-live="polite">Validando o link de recuperação…</div>
+<a class="back" href="./admin/">Voltar ao login</a>
+</main>
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+const supabase=createClient('https://ywxqdcepqqsrpnymrcli.supabase.co','sb_publishable_x1wmB9skBnQRBecw5nIIHQ_PZNPBrWX',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const form=document.getElementById('password-form'),button=document.getElementById('save'),message=document.getElementById('message');
+let validSession=false;
+const {data,error}=await supabase.auth.getSession();
+if(error){message.textContent='Não foi possível validar o link: '+error.message;}
+else if(data.session){validSession=true;message.textContent='Link validado. Digite e confirme sua nova senha.';}
+else{form.hidden=true;message.textContent='Este link não está ativo ou expirou. Volte ao login e solicite outro link de recuperação.';}
+form.addEventListener('submit',async event=>{
+ event.preventDefault();if(!validSession)return;
+ const password=document.getElementById('password').value,confirm=document.getElementById('confirm').value;
+ if(password.length<8){message.textContent='A senha precisa ter pelo menos 8 caracteres.';return;}
+ if(password!==confirm){message.textContent='As senhas não são iguais.';return;}
+ button.disabled=true;button.textContent='Salvando…';
+ try{
+  const {error}=await supabase.auth.updateUser({password});
+  if(error)throw error;
+  await supabase.auth.signOut();
+  message.textContent='Senha alterada. Agora entre no painel com seu e-mail e a nova senha.';
+  form.hidden=true;validSession=false;
+ }catch(error){message.textContent='Não foi possível alterar a senha: '+(error?.message||'erro de conexão');}
+ finally{button.disabled=false;button.textContent='Salvar nova senha';}
+});
+</script></body></html>
