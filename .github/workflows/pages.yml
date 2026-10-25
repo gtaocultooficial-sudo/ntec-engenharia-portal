@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/pages.yml'
       - '.deploy-trigger'
+      - 'apply_ntec_report_features.py'
   workflow_dispatch:
 
 permissions:
