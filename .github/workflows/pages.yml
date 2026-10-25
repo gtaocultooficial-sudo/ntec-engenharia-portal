@@ -44,21 +44,13 @@ jobs:
           # Fail the build if the login's actual Supabase auth code is missing.
           grep -q "createClient(" _site/admin/index.html
           grep -q "signInWithPassword" _site/admin/index.html
-          # Add recovery routes to the static bundle.
+          # Add recovery routes, the report calculations and persistent equipment defaults.
           cp recuperar-acesso.html _site/recuperar-acesso.html
           cp atualizar-senha.html _site/atualizar-senha.html
-          python3 - <<'PY'
-          from pathlib import Path
-          page = Path("_site/admin/index.html")
-          html = page.read_text(encoding="utf-8")
-          anchor = '<button class="auth-toggle" id="ntec-show-signup" type="button">Sou cliente — criar acesso</button>'
-          link = '<a id="ntec-forgot-password" href="../recuperar-acesso.html" style="display:block;margin-top:12px;text-align:center;color:#1f5f91;font-size:13px">Esqueci minha senha</a>'
-          if "ntec-forgot-password" not in html:
-              if anchor not in html:
-                  raise SystemExit("Could not find login form insertion point; refusing to publish")
-              html = html.replace(anchor, anchor + link, 1)
-              page.write_text(html, encoding="utf-8")
-          PY
+          python3 apply_ntec_report_features.py _site/admin/index.html
+          grep -q "updateReportTitleAuto" _site/admin/index.html
+          grep -q "ntecRecalc" _site/admin/index.html
+          grep -q "report_number" _site/admin/index.html
           test -s _site/recuperar-acesso.html
           test -s _site/atualizar-senha.html
           rm -f _site/netlify.toml
