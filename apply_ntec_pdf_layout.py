@@ -110,7 +110,7 @@ replacement = r"""function printNtecReport(id){
  '<div class="n-footer-note">Os resultados apresentados referem-se às amostras e informações identificadas neste relatório. A interpretação deve considerar a edição normativa aplicável, o procedimento efetivamente realizado, os critérios de aceitação e as especificações do projeto. A emissão final deve ser revisada e validada pelo responsável técnico.</div>'+
  '<div class="n-date">Data do relatório: '+esc(fmtDate(dateValue))+'</div>'+
  '<div class="n-signature"><div class="n-line">'+esc(responsible||'Responsável técnico')+'<br>'+esc(registration||'Registro profissional')+'<br>NTEC ENGENHARIA &amp; GEOTECNIA</div><div class="n-line">Assinatura do responsável técnico</div></div>'+
- '<div class="n-print-actions"><button onclick="window.print()">Imprimir / salvar como PDF</button></div></main><script>window.onload=()=>setTimeout(()=>window.print(),250)<\\/script></body></html>';
+ '<div class="n-print-actions"><button onclick="window.print()">Imprimir / salvar como PDF</button></div></main><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>';
  const w=window.open('','_blank');
  if(!w)return alert('Permita pop-ups para gerar o PDF.');
  w.document.open();w.document.write(doc);w.document.close();
