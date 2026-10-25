@@ -52,6 +52,41 @@ jobs:
           grep -q "updateReportTitleAuto" _site/admin/index.html
           grep -q "ntecRecalc" _site/admin/index.html
           grep -q "report_number" _site/admin/index.html
+          # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class InlineScripts(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.current = None
+                  self.blocks = []
+              def handle_starttag(self, tag, attrs):
+                  if tag.lower() == "script":
+                      a = dict(attrs)
+                      self.current = None if a.get("src") else (a.get("type", "").lower(), [])
+              def handle_data(self, data):
+                  if self.current is not None:
+                      self.current[1].append(data)
+              def handle_endtag(self, tag):
+                  if tag.lower() == "script" and self.current is not None:
+                      kind, parts = self.current
+                      self.blocks.append((kind, "".join(parts)))
+                      self.current = None
+          parser = InlineScripts()
+          parser.feed(Path("_site/admin/index.html").read_text(encoding="utf-8"))
+          scripts = [(kind, body) for kind, body in parser.blocks if body.strip() and kind not in ("application/json", "application/ld+json")]
+          if len(scripts) < 2:
+              raise SystemExit(f"Expected the Supabase module and app script; found {len(scripts)} inline script blocks")
+          for i, (kind, body) in enumerate(scripts):
+              suffix = ".mjs" if kind == "module" else ".js"
+              Path(f"/tmp/ntec-inline-{i}{suffix}").write_text(body, encoding="utf-8")
+              print(f"Prepared inline script {i} ({kind or 'classic'}, {len(body)} chars)")
+          PY
+          for script in /tmp/ntec-inline-*.js /tmp/ntec-inline-*.mjs; do
+            [ -e "$script" ] || continue
+            node --check "$script"
+          done
           test -s _site/recuperar-acesso.html
           test -s _site/atualizar-senha.html
           rm -f _site/netlify.toml
