@@ -32,7 +32,7 @@ s=s.replace(old,"esc('OBRA'+String(p.work_number||'').padStart(3,'0')+' · '+(p.
 # Auto-title, suppress generated fields in per-test fields.
 once("(function initReportTemplates(){","Object.values(REPORT_TEMPLATES).forEach(t=>{t.fields=(t.fields||[]).filter(f=>!['report_number','record_number'].includes(f.name));});\nlet lastAutoReportTitle='',reportTitleWasEdited=false;\nfunction ntecToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}\nfunction ntecSelectedProject(){return projectsData.find(p=>String(p.id)===String(document.getElementById('reportproject')?.value||''))}\nfunction updateReportTitleAuto(){const el=document.getElementById('reporttitle');if(!el)return;const tpl=REPORT_TEMPLATES[document.getElementById('reporttype')?.value||'ruptura_concreto']||REPORT_TEMPLATES.outro;const p=ntecSelectedProject();const next=(tpl.label||'Relatório técnico')+(p?' — '+p.name:'');if(!reportTitleWasEdited||!el.value||el.value===lastAutoReportTitle){el.value=next;lastAutoReportTitle=next;reportTitleWasEdited=false;}}\nfunction ntecNextSeries(projectId){const values=reports.filter(r=>String(r.project_id)===String(projectId)).map(r=>Number.parseInt(r.structured_data?.fields?.series,10)).filter(n=>Number.isInteger(n)&&n>0);return values.length?Math.max(...values)+1:1;}\nfunction ntecSetSeriesForWork(force=false){const e=document.querySelector('#reporttemplatefields [data-report-field=\"series\"]');if(!e)return;e.readOnly=false;e.disabled=false;if(!force&&e.dataset.ntecManualSeries==='1')return;const projectId=document.getElementById('reportproject')?.value;e.value=String(projectId?ntecNextSeries(projectId):1);e.dataset.ntecAutoSeries='1';e.dataset.ntecLastAutoSeries=e.value;e.dataset.ntecManualSeries='0';}\nfunction updateReportNumberPreview(){const el=document.getElementById('reportnumber');if(!el)return;const p=ntecSelectedProject();if(!p){el.value='';el.placeholder='Gerado ao selecionar obra e salvar';return;}const prefix='OBRA'+String(p.work_number||'').padStart(3,'0')+'-REL-';const used=reports.filter(r=>String(r.project_id)===String(p.id)).map(r=>String(r.report_number||'')).filter(n=>n.startsWith(prefix)).map(n=>Number(n.slice(prefix.length))).filter(n=>Number.isInteger(n)&&n>0);const next=(used.length?Math.max(...used):0)+1;el.value=prefix+String(next).padStart(4,'0');el.placeholder='Número previsto; definitivo ao salvar';}\n(function initReportTemplates(){",'setup de título')
 rx(r"\(function initReportTemplates\(\)\{const sel=document\.getElementById\('reporttype'\);if\(!sel\)return;sel\.innerHTML=.*?renderReportTemplateFields\(\);\}\)\(\);",
-"""(function initReportTemplates(){const sel=document.getElementById('reporttype');if(!sel)return;sel.innerHTML=Object.entries(REPORT_TEMPLATES).map(([value,t])=>'<option value="'+esc(value)+'">'+esc(t.label)+'</option>').join('');sel.value='ruptura_concreto';sel.addEventListener('change',()=>{reportTitleWasEdited=false;renderReportTemplateFields();updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true)});document.getElementById('reportproject')?.addEventListener('change',()=>{updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true)});document.getElementById('reporttitle')?.addEventListener('input',()=>{if(document.getElementById('reporttitle').value!==lastAutoReportTitle)reportTitleWasEdited=true});renderReportTemplateFields();updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true)})();""",'eventos de título')
+"""(function initReportTemplates(){const sel=document.getElementById('reporttype');if(!sel)return;sel.innerHTML=Object.entries(REPORT_TEMPLATES).map(([value,t])=>'<option value="'+esc(value)+'">'+esc(t.label)+'</option>').join('');sel.value='ruptura_concreto';sel.addEventListener('change',()=>{reportTitleWasEdited=false;renderReportTemplateFields();updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true);ntecWireNarrative();ntecGenerateNarrative(true)});document.getElementById('reportproject')?.addEventListener('change',()=>{updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true);ntecGenerateNarrative(false)});document.getElementById('reporttitle')?.addEventListener('input',()=>{if(document.getElementById('reporttitle').value!==lastAutoReportTitle)reportTitleWasEdited=true});renderReportTemplateFields();updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true);ntecWireNarrative();ntecGenerateNarrative(true)})();""",'eventos de título')
 marker='function renderReportTemplateFields(values={})'
 calc=r'''const ntecOriginalMatrixDefinition = matrixDefinition;
 matrixDefinition = function(name){
@@ -69,6 +69,109 @@ function ntecRecalc(row,name){const t=document.getElementById('reporttype')?.val
 }
 '''
 once(marker,calc+marker,'motor de cálculo')
+narrative = r'''function ntecNarrativeFieldEntries(){
+ const holder=document.getElementById('reporttemplatefields');
+ if(!holder)return [];
+ return [...holder.querySelectorAll('[data-report-field]')].map(el=>{
+   const box=el.closest('.field'),label=box?.querySelector('label')?.textContent?.trim()||el.dataset.reportField||'Campo';
+   let value=String(el.value||'').trim();
+   if(!value)return null;
+   if(el.type==='date'&&/^\d{4}-\d{2}-\d{2}$/.test(value))value=value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4);
+   return {key:el.dataset.reportField,label,value};
+ }).filter(Boolean);
+}
+function ntecNarrativeMatrices(){
+ const tpl=REPORT_TEMPLATES[document.getElementById('reporttype')?.value||'']||{};
+ const names=['primary'];
+ if(tpl.extraMatrix?.name)names.push(tpl.extraMatrix.name);
+ const out=[];
+ for(const name of names){
+   const def=matrixDefinition(name),body=document.querySelector('tbody[data-report-matrix-rows="'+name+'"]');
+   if(!def||!body)continue;
+   const rows=[...body.querySelectorAll('tr')].map(row=>def.columns.map((col,i)=>({label:String(col),value:String(row.querySelector('[data-matrix-cell="'+i+'"]')?.value||'').trim()})).filter(x=>x.value)).filter(row=>row.length);
+   if(rows.length)out.push({name,columns:def.columns,rows});
+ }
+ return out;
+}
+function ntecGenerateNarrative(force=false){
+ const type=document.getElementById('reporttype')?.value||'outro';
+ const tpl=REPORT_TEMPLATES[type]||REPORT_TEMPLATES.outro||{label:'Relatório técnico',norms:''};
+ const project=ntecSelectedProject();
+ const title=String(document.getElementById('reporttitle')?.value||tpl.label||'Relatório técnico').trim();
+ const date=String(document.getElementById('reportdate')?.value||ntecToday());
+ const pdate=/^\d{4}-\d{2}-\d{2}$/.test(date)?date.slice(8,10)+'/'+date.slice(5,7)+'/'+date.slice(0,4):date;
+ const norm=String(document.getElementById('reportnormativerefs')?.value||tpl.norms||'').trim();
+ const entries=ntecNarrativeFieldEntries();
+ const core=entries.filter(x=>!['equipment','calibration','operator','meter_type','apparatus'].includes(x.key));
+ const equipment=entries.filter(x=>['equipment','calibration','operator','meter_type','apparatus'].includes(x.key));
+ const matrices=ntecNarrativeMatrices();
+ const matrixLines=[];
+ let resistanceValues=[];
+ for(const mat of matrices){
+   mat.rows.forEach((row,i)=>{
+     matrixLines.push((mat.name==='primary'?'Registro '+(i+1):'Registro complementar '+(i+1))+': '+row.map(x=>x.label+': '+x.value).join('; ')+'.');
+   });
+   const ri=mat.columns.findIndex(h=>{const t=ntecHeader(h);return t.includes('resistencia')&&t.includes('mpa')&&!t.includes('corrigida')});
+   if(ri>=0)for(const row of mat.rows){const val=ntecNum(row[ri]?.value);if(Number.isFinite(val))resistanceValues.push(val);}
+ }
+ const client=project?.clients?.company_name||'cliente não informado';
+ const work=project?.name||'obra não selecionada';
+ const workNum=project?.work_number?'OBRA'+String(project.work_number).padStart(3,'0'):'';
+ const fieldSentence=core.length?'Dados registrados: '+core.map(x=>x.label+': '+x.value).join('; ')+'.':'Não foram fornecidos dados complementares de identificação da amostra.';
+ const content='Este relatório técnico registra o serviço "'+(tpl.label||'ensaio técnico')+'" realizado para '+client+', na obra "'+work+'"'+(workNum?' ('+workNum+')':'')+'. Data do relatório: '+pdate+'. '+fieldSentence+' O escopo e a identificação apresentados foram montados automaticamente a partir dos campos preenchidos nesta ficha.';
+ const equipmentSentence=equipment.length?' Equipamento e registros informados: '+equipment.map(x=>x.label+': '+x.value).join('; ')+'.':'';
+ const method='Modelo de procedimento: '+(tpl.label||'ensaio técnico')+'. Referências normativas sugeridas no modelo: '+(norm||'não cadastradas para este modelo')+'.'+equipmentSentence+' A equipe deve confirmar que a edição da norma, a preparação das amostras, as condições de ensaio, os equipamentos e o procedimento efetivamente executado correspondem ao serviço realizado. Este texto foi elaborado automaticamente a partir do modelo selecionado e não comprova, por si só, a execução integral de qualquer norma.';
+ let results;
+ if(matrixLines.length){
+   results='Dados de ensaio registrados na ficha:\n'+matrixLines.join('\n');
+   if(resistanceValues.length){
+     const avg=resistanceValues.reduce((a,b)=>a+b,0)/resistanceValues.length;
+     results+='\nResumo numérico das resistências informadas/calculadas: '+resistanceValues.length+' resultado(s); média aritmética '+ntecFmt(avg,2)+' MPa; mínimo '+ntecFmt(Math.min(...resistanceValues),2)+' MPa; máximo '+ntecFmt(Math.max(...resistanceValues),2)+' MPa.';
+   }
+ } else {
+   results='Os resultados serão descritos a partir das leituras registradas na tabela de ensaio. Nenhuma leitura foi presumida ou criada automaticamente.';
+ }
+ let conclusion;
+ if(matrixLines.length){
+   conclusion='Foram organizados automaticamente '+matrixLines.length+' registro(s) com os valores disponíveis na ficha. '+(resistanceValues.length?'A série de resistência apresenta média aritmética de '+ntecFmt(resistanceValues.reduce((a,b)=>a+b,0)/resistanceValues.length,2)+' MPa, com valores entre '+ntecFmt(Math.min(...resistanceValues),2)+' e '+ntecFmt(Math.max(...resistanceValues),2)+' MPa. ':'')+'A avaliação de atendimento ou não atendimento deve considerar os critérios de aceitação da norma vigente, o projeto/especificação, a idade do ensaio e o plano de amostragem aplicável. O sistema não declara aprovação ou reprovação automaticamente. Revisão e validação do responsável técnico são necessárias antes da emissão.';
+ } else {
+   conclusion='A conclusão técnica final deve ser definida após o registro e a conferência dos resultados medidos, dos critérios de aceitação aplicáveis e dos requisitos do projeto. O sistema não presume resultados nem declara conformidade automaticamente. Revisão e validação do responsável técnico são necessárias antes da emissão.';
+ }
+ const generated={reportcontent:content,reportmethod:method,reportresults:results,reportobservations:conclusion};
+ for(const [id,value] of Object.entries(generated)){
+   const el=document.getElementById(id);
+   if(!el)continue;
+   if(force||!el.dataset.ntecManual||el.value===el.dataset.ntecLastGenerated){
+     el.value=value;
+     el.dataset.ntecLastGenerated=value;
+     el.dataset.ntecGenerated='1';
+   }
+ }
+}
+function ntecWireNarrative(){
+ const form=document.getElementById('reportform');
+ if(!form||form.dataset.ntecNarrativeWired==='1')return;
+ form.dataset.ntecNarrativeWired='1';
+ form.addEventListener('input',e=>{
+   const el=e.target;
+   if(el.matches('#reportcontent,#reportmethod,#reportresults,#reportobservations')){
+     el.dataset.ntecManual='1';
+     return;
+   }
+   ntecGenerateNarrative(false);
+ });
+ form.addEventListener('change',e=>{
+   const el=e.target;
+   if(el.matches('#reportcontent,#reportmethod,#reportresults,#reportobservations')){
+     el.dataset.ntecManual='1';
+     return;
+   }
+   ntecGenerateNarrative(false);
+ });
+}
+document.getElementById('reportform')?.addEventListener('toggle',()=>ntecGenerateNarrative(false));
+'''
+once(marker,narrative+marker,'gerador automático da redação técnica')
 rx(r"function addReportMatrixRow\(name,values=\[\]\)\{.*?\}\s*function collectMatrixText",
 """function addReportMatrixRow(name,values=[]){const def=matrixDefinition(name),body=document.querySelector('[data-report-matrix-rows="'+name+'"]');if(!def||!body)return;const tr=document.createElement('tr'),computed=ntecComputed(name);tr.innerHTML=def.columns.map((col,i)=>'<td><input type="text" inputmode="decimal" data-matrix-cell="'+i+'" aria-label="'+esc(col)+'" title="'+esc(col)+'" placeholder="'+esc(col)+'" value="'+esc(values[i]??'')+'" '+(computed.includes(i)?'readonly data-computed="1"':'')+'></td>').join('')+'<td><button type="button" class="btn matrix-delete" aria-label="Remover linha" title="Remover linha" onclick="this.closest(\\'tr\\').remove()">×</button></td>';body.appendChild(tr);ntecRecalc(tr,name)}
 function collectMatrixText""",'linhas calculadas')
@@ -80,10 +183,10 @@ listeners="""document.getElementById('reporttemplatefields')?.addEventListener('
 once('function collectReportStructuredData()',listeners+'function collectReportStructuredData()','armazenamento dos equipamentos')
 once(".map(r=>({...r,structured_data:r.structured_data||{},normative_references:r.normative_references||'',client:r.projects?.clients?.company_name||'Cliente',project:r.projects?.name||'Obra',typeLabel:reportTypeLabel(r.report_type),statusLabel:",".map(r=>({...r,structured_data:r.structured_data||{},normative_references:r.normative_references||'',client:r.projects?.clients?.company_name||'Cliente',project:r.projects?.name||'Obra',work_number:r.projects?.work_number||null,typeLabel:reportTypeLabel(r.report_type),statusLabel:",'mapeamento da obra do relatório')
 rx(r"function clearReportForm\(\)\{.*?\}\s*async function addReport",
-"""function clearReportForm(){['reporttitle','reportcontent','reportmethod','reportresults','reportobservations','reportresponsible','reportregistration'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});const d=document.getElementById('reportdate');if(d)d.value=ntecToday();const n=document.getElementById('reportnumber');if(n)n.value='';const p=document.getElementById('reportproject');if(p)p.value='';reportTitleWasEdited=false;lastAutoReportTitle='';renderReportTemplateFields();updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true)}
+"""function clearReportForm(){['reporttitle','reportcontent','reportmethod','reportresults','reportobservations','reportresponsible','reportregistration'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';delete el.dataset.ntecManual;delete el.dataset.ntecLastGenerated;delete el.dataset.ntecGenerated;}});const d=document.getElementById('reportdate');if(d)d.value=ntecToday();const n=document.getElementById('reportnumber');if(n)n.value='';const p=document.getElementById('reportproject');if(p)p.value='';reportTitleWasEdited=false;lastAutoReportTitle='';renderReportTemplateFields();updateReportTitleAuto();updateReportNumberPreview();ntecSetSeriesForWork(true)}
 async function addReport""",'limpeza de formulário')
 rx(r"async function addReport\(\)\{.*?\}\s*function renderReports",
-"""async function addReport(){const projectId=document.getElementById('reportproject').value,title=document.getElementById('reporttitle').value.trim(),type=document.getElementById('reporttype').value,tpl=REPORT_TEMPLATES[type]||REPORT_TEMPLATES.outro;if(!projectId||!title)return alert('Selecione a obra e confira o título do relatório.');for(const f of (tpl.fields||[])){const el=document.querySelector('#reporttemplatefields [data-report-field="'+f.name+'"]');if(f.required&&el&&!String(el.value||'').trim()){el.focus();return alert('Preencha o campo obrigatório: '+f.label)}}if(tpl.matrix?.required&&!reportMatrixHasData('primary'))return alert('Preencha pelo menos uma linha em: '+tpl.matrix.label);if(tpl.extraMatrix?.required&&!reportMatrixHasData(tpl.extraMatrix.name))return alert('Preencha pelo menos uma linha em: '+tpl.extraMatrix.label);const btn=document.querySelector('#reportform button.btn.primary');if(btn){btn.disabled=true;btn.textContent='Salvando…'}try{const saved=await window.NTEC_SUPABASE.saveReport({projectId,title,type,date:document.getElementById('reportdate').value,content:document.getElementById('reportcontent').value,methodology:document.getElementById('reportmethod').value,results:document.getElementById('reportresults').value,observations:document.getElementById('reportobservations').value,technicalResponsible:document.getElementById('reportresponsible').value,professionalRegistration:document.getElementById('reportregistration').value,normativeReferences:document.getElementById('reportnormativerefs').value,structuredData:collectReportStructuredData()});const exact=saved?.reportNumber||'';reports=await window.NTEC_SUPABASE.loadReports();renderReports();clearReportForm();closeForm('reportform');alert('Relatório '+exact+' salvo como rascunho. Confira cálculos, unidades e referência normativa antes de emitir.')}catch(err){alert('Não foi possível salvar o relatório: '+(err?.message||'erro desconhecido'))}finally{if(btn){btn.disabled=false;btn.textContent='Salvar relatório no banco'}}}
+"""async function addReport(){ntecGenerateNarrative(false);const projectId=document.getElementById('reportproject').value,title=document.getElementById('reporttitle').value.trim(),type=document.getElementById('reporttype').value,tpl=REPORT_TEMPLATES[type]||REPORT_TEMPLATES.outro;if(!projectId||!title)return alert('Selecione a obra e confira o título do relatório.');for(const f of (tpl.fields||[])){const el=document.querySelector('#reporttemplatefields [data-report-field="'+f.name+'"]');if(f.required&&el&&!String(el.value||'').trim()){el.focus();return alert('Preencha o campo obrigatório: '+f.label)}}if(tpl.matrix?.required&&!reportMatrixHasData('primary'))return alert('Preencha pelo menos uma linha em: '+tpl.matrix.label);if(tpl.extraMatrix?.required&&!reportMatrixHasData(tpl.extraMatrix.name))return alert('Preencha pelo menos uma linha em: '+tpl.extraMatrix.label);const btn=document.querySelector('#reportform button.btn.primary');if(btn){btn.disabled=true;btn.textContent='Salvando…'}try{const saved=await window.NTEC_SUPABASE.saveReport({projectId,title,type,date:document.getElementById('reportdate').value,content:document.getElementById('reportcontent').value,methodology:document.getElementById('reportmethod').value,results:document.getElementById('reportresults').value,observations:document.getElementById('reportobservations').value,technicalResponsible:document.getElementById('reportresponsible').value,professionalRegistration:document.getElementById('reportregistration').value,normativeReferences:document.getElementById('reportnormativerefs').value,structuredData:collectReportStructuredData()});const exact=saved?.reportNumber||'';reports=await window.NTEC_SUPABASE.loadReports();renderReports();clearReportForm();closeForm('reportform');alert('Relatório '+exact+' salvo como rascunho. Confira cálculos, unidades e referência normativa antes de emitir.')}catch(err){alert('Não foi possível salvar o relatório: '+(err?.message||'erro desconhecido'))}finally{if(btn){btn.disabled=false;btn.textContent='Salvar relatório no banco'}}}
 function renderReports""",'salvamento do relatório')
 rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
 """function renderReports(){document.getElementById('reportsbody').innerHTML=reports.length?reports.map(r=>'<tr><td><strong>'+esc(r.report_number||'Número pendente')+'</strong><div>'+esc(r.title)+'</div><div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(r.statusLabel||r.status||'Rascunho')+'</td><td><button class="btn" onclick="editReport(\\''+esc(r.id)+'\\')">Editar</button> <button class="btn" onclick="printNtecReport(\\''+esc(r.id)+'\\')">PDF</button></td></tr>').join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>'}
