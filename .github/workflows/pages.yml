@@ -52,6 +52,7 @@ jobs:
           grep -q "updateReportTitleAuto" _site/admin/index.html
           grep -q "ntecRecalc" _site/admin/index.html
           grep -q "report_number" _site/admin/index.html
+          grep -q "Carga (tf)" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
