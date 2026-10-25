@@ -51,6 +51,8 @@ jobs:
           python3 apply_ntec_report_features.py _site/admin/index.html
           grep -q "updateReportTitleAuto" _site/admin/index.html
           grep -q "ntecRecalc" _site/admin/index.html
+          grep -q "ntecGenerateNarrative" _site/admin/index.html
+          grep -q "Referências normativas sugeridas no modelo" _site/admin/index.html
           grep -q "report_number" _site/admin/index.html
           grep -q "Carga (tf)" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
