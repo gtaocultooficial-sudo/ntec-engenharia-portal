@@ -4,6 +4,7 @@ import re, sys
 
 path = Path(sys.argv[1] if len(sys.argv) > 1 else "_site/admin/index.html")
 s = path.read_text(encoding="utf-8")
+s = s.replace("Portal NTEC · v17", "Portal NTEC · v18")
 
 def once(old, new, label):
     global s
