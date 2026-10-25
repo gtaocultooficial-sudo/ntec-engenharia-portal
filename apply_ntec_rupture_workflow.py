@@ -221,7 +221,6 @@ function ntecReportStatusText(report){
  return report.statusLabel||report.status||'Rascunho';
 }
 '''
-once("function matrixHtml",staged_js+"\nfunction matrixHtml",'funções de lançamento posterior')
 
 rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
 """function renderReports(){
@@ -231,6 +230,7 @@ rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
  }).join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>';
 }
 function matrixHtml""",'botão de lançamento de ruptura')
+once("function matrixHtml",staged_js+"\nfunction matrixHtml",'funções de lançamento posterior')
 
 for token in ['async updateReportResults','openRuptureEntry','ntecRuptureCalculateResistance','Aguardando ruptura','Salvar resultados parciais']:
     if token not in s:
