@@ -7,6 +7,7 @@ on:
       - '.github/workflows/pages.yml'
       - '.deploy-trigger'
       - 'apply_ntec_report_features.py'
+      - 'apply_ntec_pdf_layout.py'
   workflow_dispatch:
 
 permissions:
@@ -49,11 +50,15 @@ jobs:
           cp recuperar-acesso.html _site/recuperar-acesso.html
           cp atualizar-senha.html _site/atualizar-senha.html
           python3 apply_ntec_report_features.py _site/admin/index.html
+          python3 apply_ntec_pdf_layout.py _site/admin/index.html
           grep -q "updateReportTitleAuto" _site/admin/index.html
           grep -q "ntecRecalc" _site/admin/index.html
           grep -q "ntecGenerateNarrative" _site/admin/index.html
           grep -q "Referências normativas sugeridas no modelo" _site/admin/index.html
           grep -q "report_number" _site/admin/index.html
+          grep -q "size:A4 portrait" _site/admin/index.html
+          grep -q "DADOS DO CLIENTE / OBRA" _site/admin/index.html
+          grep -q "NTEC ENGENHARIA &amp; GEOTECNIA" _site/admin/index.html
           grep -q "Carga (tf)" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
