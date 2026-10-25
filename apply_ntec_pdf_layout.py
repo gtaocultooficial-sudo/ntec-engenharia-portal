@@ -57,6 +57,7 @@ replacement = r"""function printNtecReport(id){
   {label:'CÓDIGO DA OBRA',value:fields.record_number||workCode},
   {label:'RELATÓRIO Nº',value:reportNumber},
   {label:'DATA DO RELATÓRIO',value:fmtDate(dateValue)},
+  {label:'STATUS',value:typeof ntecReportStatusText==='function'?ntecReportStatusText(r):(r.statusLabel||r.status||'Rascunho')},
   {label:'FORNECEDOR',value:fields.supplier||fields.concrete_supplier||fields.vendor||'—'}
  ];
  const fieldDefs=(tpl.fields||[]).filter(f=>!['report_number','record_number','series'].includes(f.name)&&String(fields[f.name]??'').trim()!=='');
@@ -98,7 +99,9 @@ replacement = r"""function printNtecReport(id){
   const groups={};
   observed.forEach(v=>{const key=String(v.age);(groups[key]||(groups[key]=[])).push(v.resistance)});
   const points=Object.keys(groups).map(key=>({age:Number(key),mean:groups[key].reduce((a,b)=>a+b,0)/groups[key].length,n:groups[key].length})).sort((a,b)=>a.age-b.age);
-  const maxAge=Math.max(1,...points.map(p=>p.age)),maxValue=Math.max(5,...points.map(p=>p.mean)),yMax=Math.ceil(maxValue/5)*5||5;
+  const fckEntry=Object.entries(fields).find(([key,value])=>/fck|resistencia[_ ]?(de projeto|especificada)/i.test(key)&&parseNumber(String(value).match(/-?\d+(?:[.,]\d+)?/)?.[0])>0);
+  const fck=fckEntry?parseNumber(String(fckEntry[1]).match(/-?\d+(?:[.,]\d+)?/)?.[0]):NaN;
+  const maxAge=Math.max(1,...points.map(p=>p.age)),maxValue=Math.max(5,...points.map(p=>p.mean),...(Number.isFinite(fck)?[fck]:[])),yMax=Math.ceil(maxValue/5)*5||5;
   const W=680,H=280,L=64,R=22,T=28,B=48,PW=W-L-R,PH=H-T-B;
   const x=age=>L+(age/maxAge)*PW,y=value=>T+PH-(value/yMax)*PH;
   let svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Curva de resistência por idade" style="width:100%;height:auto;display:block">';
@@ -110,9 +113,10 @@ replacement = r"""function printNtecReport(id){
   const xTicks=[...new Set([0,...points.map(p=>p.age),maxAge])].sort((a,b)=>a-b);
   xTicks.forEach(age=>{const xx=x(age);svg+='<line x1="'+xx+'" y1="'+(H-B)+'" x2="'+xx+'" y2="'+(H-B+4)+'" stroke="#333"/><text x="'+xx+'" y="'+(H-B+16)+'" text-anchor="middle" font-size="10" fill="#3d4a58">'+age+'</text>'});
   if(points.length>1){const path=points.map((p,i)=>(i?'L':'M')+' '+x(p.age)+' '+y(p.mean)).join(' ');svg+='<path d="'+path+'" fill="none" stroke="#1f5f91" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'}
+  if(Number.isFinite(fck)){const yy=y(fck);svg+='<line x1="'+L+'" y1="'+yy+'" x2="'+(W-R)+'" y2="'+yy+'" stroke="#b7791f" stroke-width="1.8" stroke-dasharray="6 4"/><text x="'+(W-R-2)+'" y="'+Math.max(T+10,yy-5)+'" text-anchor="end" font-size="10" fill="#8c5a12">Fck '+fck.toLocaleString('pt-BR',{maximumFractionDigits:2})+' MPa</text>'}
   points.forEach(p=>{const xx=x(p.age),yy=y(p.mean);svg+='<circle cx="'+xx+'" cy="'+yy+'" r="4" fill="#1f5f91" stroke="#fff" stroke-width="1.4"/><text x="'+xx+'" y="'+Math.max(14,yy-9)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#173c5a">'+p.mean.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'</text>'});
   svg+='<text x="'+(L+PW/2)+'" y="'+(H-7)+'" text-anchor="middle" font-size="11" fill="#172536">Idade do ensaio (dias)</text><text transform="translate(15 '+(T+PH/2)+') rotate(-90)" text-anchor="middle" font-size="11" fill="#172536">Resistência (MPa)</text></svg>';
-  const averageDetails=points.map(p=>p.age+' dias: '+p.mean.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' MPa (n='+p.n+')').join(' · ');
+  const averageDetails=points.map(p=>p.age+' dias: '+p.mean.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' MPa (n='+p.n+')').join(' · ')+(Number.isFinite(fck)?' · Fck de projeto: '+fck.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' MPa':'');
   const developing=points.length<2?'<div class="n-chart-note">Curva em formação: há resultado para apenas uma idade. Registre outros rompimentos para visualizar a evolução ao longo do tempo.</div>':'';
   return sectionTitle+'<div class="n-chart">'+svg+'<div class="n-chart-caption">Média aritmética dos CPs com resistência registrada em cada idade. '+esc(averageDetails)+'.</div>'+developing+'</div>';
  };
