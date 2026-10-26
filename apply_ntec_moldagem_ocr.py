@@ -140,6 +140,56 @@ panel = r"""
        {key:'slump',label:'Abatimento teórico',left:.29,right:.42,top:.195,bottom:.255},
        {key:'application',label:'Local de aplicação',left:.30,right:.515,top:.265,bottom:.66}
      ];
+     function ocrFieldClean(key,text){
+       let value=String(text||'').replace(/\s+/g,' ').trim();
+       if(key==='supplier')value=value.replace(/\b(fornecedor|lan[cç]amento|bombeado|convencional|abatimento|obtido|local de aplica[cç][aã]o|informado pelo cliente)\b/gi,' ');
+       if(key==='contractor')value=value.replace(/\bconstrutora\b/gi,' ');
+       if(key==='address')value=value.replace(/\bendere[cç]o\b/gi,' ');
+       if(key==='application')value=value.replace(/\b(local de aplica[cç][aã]o|informado pelo cliente|quantidade|forma|obra)\b/gi,' ').replace(/^\s*(?:\d{1,3}\s+){1,3}/,' ');
+       return value.replace(/\s+/g,' ').trim().replace(/^[|:=\- ]+|[|:=\- ]+$/g,'');
+     }
+     function ocrFieldScore(field,text,confidence){
+       const raw=String(text||'').trim(),key=field.key;
+       if(!raw)return -100;
+       let score=0;
+       if(key==='casting_date'){
+         const m=raw.match(/\b\d{1,2}[\s\/.,'-]\d{1,2}[\s\/.,'-]\d{2,4}\b/);
+         score=m?100:-50;
+       }else if(key==='work_code'){
+         const withoutNBR=raw.replace(/\bNBR\b.*$/i,'');
+         const m=withoutNBR.match(/\b\d{3,6}\b/);
+         score=m?100+m[0].length:-50;
+       }else if(key==='fck'||key==='slump'){
+         const nums=raw.match(/\b\d{1,3}(?:[.,]\d+)?\b/g)||[];
+         const valid=nums.map(x=>Number(x.replace(',','.'))).filter(n=>key==='fck'?(n>=10&&n<=100):(n>=0&&n<=300));
+         score=valid.length?55+valid.length*5:-50;
+       }else{
+         const cleaned=ocrFieldClean(key,raw),words=cleaned.match(/[A-Za-zÀ-ÿ]{3,}/g)||[];
+         score=Math.min(cleaned.length,45)*0.3+words.length*3;
+         if(key==='supplier'&&/\b(supermix|polimix|engemix|supremo|concrebase|concrevale)\b/i.test(cleaned))score+=25;
+         if(key==='contractor'&&/\b(barros|construtora|engenharia|obras|constru[cç][aã]o)\b/i.test(cleaned))score+=10;
+         if(key==='address'&&/\b(rua|avenida|av\.|morumbi|centro|vila|jardim)\b/i.test(cleaned))score+=10;
+         if(key==='application'){
+           if(/vigas|travamento|pilar|laje|fundac[aã]o|bloco|radier|sapata/i.test(cleaned))score+=25;
+           if(/^de$/i.test(cleaned))score+=12;
+         }
+         if(!words.length&&!(key==='application'&&/^de$/i.test(cleaned)))score=-25;
+       }
+       if(Number.isFinite(confidence))score+=Math.max(0,confidence)*0.03;
+       return score;
+     }
+     async function recognizeFieldCrop(canvas,field){
+       let best={score:-1,text:''};
+       for(const mode of ['6','11','13','7']){
+         await worker.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1'});
+         const rr=await worker.recognize(canvas);
+         const txt=String(rr.data.text||'').replace(/\s+/g,' ').trim();
+         const sc=ocrFieldScore(field,txt,rr.data.confidence);
+         if(sc>best.score)best={score:sc,text:txt};
+       }
+       if(best.score<0)best.text='';
+       return best;
+     }
      const cropSuggestions=[];
      for(const f of fieldCrops){
        const crop=document.createElement('canvas');
@@ -147,15 +197,20 @@ panel = r"""
        crop.width=Math.max(1,Math.round(best.canvas.width*(f.right-f.left)));
        crop.height=Math.max(1,Math.round(best.canvas.height*(f.bottom-f.top)));
        crop.getContext('2d').drawImage(best.canvas,x,y,crop.width,crop.height,0,0,crop.width,crop.height);
-       let cellBest={score:-1,text:''};
-       for(const mode of ['7','6']){
-         await worker.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1'});
-         const rr=await worker.recognize(crop);
-         const txt=String(rr.data.text||'').replace(/\s+/g,' ').trim();
-         const sc=ocrScore(txt,rr.data.confidence);
-         if(sc>cellBest.score)cellBest={score:sc,text:txt};
+       let detected='';
+       if(f.key==='application'){
+         const lines=[{top:.27,bottom:.345},{top:.345,bottom:.42},{top:.42,bottom:.505}],parts=[];
+         for(const line of lines){
+           const part=document.createElement('canvas'),py=Math.round(best.canvas.height*line.top),ph=Math.max(1,Math.round(best.canvas.height*(line.bottom-line.top)));
+           part.width=crop.width;part.height=ph;
+           part.getContext('2d').drawImage(best.canvas,x,py,crop.width,ph,0,0,crop.width,ph);
+           const res=await recognizeFieldCrop(part,f);if(res.text)parts.push(ocrFieldClean('application',res.text));
+         }
+         detected=parts.join(' ').replace(/\s+/g,' ').trim();
+       }else{
+         const res=await recognizeFieldCrop(crop,f);detected=ocrFieldClean(f.key,res.text);
        }
-       cropSuggestions.push({key:f.key,label:f.label,text:cellBest.text||''});
+       cropSuggestions.push({key:f.key,label:f.label,text:detected,image:crop.toDataURL('image/png')});
      }
      const regions=[{name:'CABEÇALHO',from:0,to:0.34,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.25,to:0.82,left:0,right:1},{name:'TABELA — METADE ESQUERDA',from:0.25,to:0.82,left:0,right:0.52},{name:'TABELA — METADE DIREITA',from:0.25,to:0.82,left:0.48,right:1},{name:'TABELA — COLUNAS INICIAIS',from:0.30,to:0.80,left:0,right:0.34},{name:'TABELA — COLUNAS CENTRAIS',from:0.30,to:0.80,left:0.28,right:0.70},{name:'TABELA — COLUNAS FINAIS',from:0.30,to:0.80,left:0.64,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.76,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11','12']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\n'+regionBest.text);}const preview=document.getElementById('ntec-ocr-fields-preview');
      if(preview){
