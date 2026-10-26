@@ -17,8 +17,12 @@ panel = r"""
     <button type="button" class="btn secondary" id="ntec-ocr-read">Ler ficha e sugerir preenchimento</button>
   </div>
   <div id="ntec-ocr-status" role="status" aria-live="polite">Aceita foto de celular, imagem digitalizada ou PDF.</div>
-  <label for="ntec-ocr-text">Texto reconhecido (confira e corrija antes de aplicar)</label>
-  <textarea id="ntec-ocr-text" rows="7" placeholder="O texto extraído da ficha aparecerá aqui para conferência."></textarea>
+  <h4>Campos detectados — revise antes de aplicar</h4>
+  <div id="ntec-ocr-fields-preview" class="ntec-ocr-fields-preview" aria-live="polite"><p>Envie a ficha e clique em “Ler ficha”. Os campos encontrados aparecerão separados aqui para revisão.</p></div>
+  <details class="ntec-ocr-raw"><summary>Texto bruto do OCR (avançado; pode conter erros)</summary>
+    <label for="ntec-ocr-text">Texto reconhecido</label>
+    <textarea id="ntec-ocr-text" rows="6" placeholder="O texto completo reconhecido aparecerá aqui para diagnóstico."></textarea>
+  </details>
   <button type="button" class="btn secondary" id="ntec-ocr-apply">Aplicar sugestões aos campos</button>
   <hr>
   <h4>Conferência dos corpos de prova (CPs)</h4>
@@ -51,7 +55,7 @@ panel = r"""
 .ntec-ocr-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .ntec-ocr-card input[type=file]{max-width:100%;padding:8px}
 .ntec-ocr-card textarea{width:100%;box-sizing:border-box;margin:6px 0 10px}
-#ntec-ocr-status{font-size:12px;font-weight:700;margin:8px 0;color:#29465f}
+#ntec-ocr-status{font-size:12px;font-weight:700;margin:8px 0;color:#29465f}.ntec-ocr-fields-preview{display:grid;grid-template-columns:repeat(2,minmax(160px,1fr));gap:8px;margin:8px 0 12px}.ntec-ocr-fields-preview label{display:block;font-size:12px;font-weight:700;color:#29465f}.ntec-ocr-fields-preview input{display:block;box-sizing:border-box;width:100%;margin-top:4px;padding:8px;border:1px solid #cbd6e1;border-radius:5px;font-weight:400}.ntec-ocr-raw{margin:8px 0;border:1px solid #d5dee7;border-radius:7px;padding:8px}.ntec-ocr-raw summary{cursor:pointer;font-size:12px;font-weight:700;color:#526579}@media(max-width:650px){.ntec-ocr-fields-preview{grid-template-columns:1fr}}
 </style>
 <script>
 (function(){
