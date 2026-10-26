@@ -31,7 +31,8 @@ panel = r"""
   <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Nº da série de controle</th><th>Identificação do CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga real (tf), se ensaiado</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
   <h4>Gerar CPs por série</h4>
   <p>Uma linha preenchida da ficha corresponde a uma série. A série de campo é ignorada; o sistema continua a numeração de controle da obra. Ajuste os valores abaixo conforme a ficha antes de gerar.</p>
-  <button type="button" class="btn secondary" id="ntec-cp-use-form02">Preencher padrão confirmado desta ficha (FCK 40 · 10 séries)</button>
+  <button type="button" class="btn secondary" id="ntec-cp-use-form02">Aplicar ficha confirmada — 10 séries / 40 CPs</button>
+  <small>Um clique preenche os dados confirmados, gera os 40 CPs (2 aos 7 dias e 2 aos 28 dias por série) e transfere as linhas para o relatório. Revise BT, nota fiscal, volume e abatimentos antes de salvar.</small>
   <div class="ntec-series-generator">
     <label>Primeira série de controle <input id="ntec-cp-start-series" type="number" min="1" max="99999" step="1" value="1"></label>
     <label>Linhas de série preenchidas <input id="ntec-cp-series-count" type="number" min="1" max="10" step="1" value="10"></label>
