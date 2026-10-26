@@ -257,9 +257,10 @@ rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
  const rows=due.map(item=>{
   const label=item.days<0?'ATRASADA há '+Math.abs(item.days)+' dia(s)':item.days===0?'PREVISTA PARA HOJE':'Prevista em '+item.days+' dia(s)';
   const color=item.days<=0?'#a12b20':'#805b09';
-  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #ead9b4"><strong style="color:'+color+'">'+label+'</strong><span>'+esc(item.date.toLocaleDateString('pt-BR'))+'</span><span>CP '+esc(item.cp)+'</span><span>'+esc(item.report.report_number||item.report.title||'Relatório')+'</span><span>'+esc(item.report.project||'')+'</span><button type="button" class="btn secondary" onclick="openRuptureEntry(\''+esc(item.report.id)+'\')">Lançar ruptura</button></div>';
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #ead9b4"><strong style="color:'+color+'">'+label+'</strong><span>'+esc(item.date.toLocaleDateString('pt-BR'))+'</span><span>CP '+esc(item.cp)+'</span><span>'+esc(item.report.report_number||item.report.title||'Relatório')+'</span><span>'+esc(item.report.project||'')+'</span><button type="button" class="btn secondary" data-rp-report="'+esc(item.report.id)+'">Lançar ruptura</button></div>';
  }).join('');
  panel.innerHTML='<strong>⚠️ Atenção: rupturas pendentes</strong><div style="font-size:13px;margin-top:5px">Os CPs abaixo atingiram ou estão próximos da idade prevista e ainda não têm carga de prensa registrada. A data é uma previsão; se o ensaio não foi realizado, mantenha o lançamento pendente e atualize quando ocorrer.</div>'+rows;
+ panel.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
 }
 function renderReports(){
   const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" onclick="openRuptureEntry(\\''+esc(r.id)+'\\')">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
