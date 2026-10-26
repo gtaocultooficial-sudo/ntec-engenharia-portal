@@ -134,7 +134,7 @@ panel = r"""
        {key:'casting_date',label:'Data da moldagem',left:.655,right:.79,top:.06,bottom:.145},
        {key:'contractor',label:'Construtora',left:.085,right:.285,top:.155,bottom:.205},
        {key:'address',label:'Endereço',left:.285,right:.425,top:.155,bottom:.205},
-       {key:'supplier',label:'Fornecedor',left:.365,right:.55,top:.19,bottom:.255},
+       {key:'supplier',label:'Fornecedor',left:.405,right:.56,top:.18,bottom:.235},
        {key:'material',label:'Característica do material',left:.075,right:.37,top:.18,bottom:.25},
        {key:'fck',label:'FCK',left:.065,right:.16,top:.205,bottom:.275},
        {key:'slump',label:'Abatimento teórico',left:.29,right:.42,top:.195,bottom:.255},
@@ -170,8 +170,9 @@ panel = r"""
          if(key==='contractor'&&/\b(barros|construtora|engenharia|obras|constru[cç][aã]o)\b/i.test(cleaned))score+=10;
          if(key==='address'&&/\b(rua|avenida|av\.|morumbi|centro|vila|jardim)\b/i.test(cleaned))score+=10;
          if(key==='application'){
-           if(/vigas|travamento|pilar|laje|fundac[aã]o|bloco|radier|sapata/i.test(cleaned))score+=25;
-           if(/^de$/i.test(cleaned))score+=12;
+           if(/vigas|travamento|pilar|laje|funda[cç][aã]o|bloco|radier|sapata|baldrame|parede/i.test(cleaned))score=50+Math.min(cleaned.length,30);
+           else if(/^de$/i.test(cleaned))score=12;
+           else score=-40;
          }
          if(!words.length&&!(key==='application'&&/^de$/i.test(cleaned)))score=-25;
        }
@@ -199,7 +200,7 @@ panel = r"""
        crop.getContext('2d').drawImage(best.canvas,x,y,crop.width,crop.height,0,0,crop.width,crop.height);
        let detected='';
        if(f.key==='application'){
-         const lines=[{top:.27,bottom:.345},{top:.345,bottom:.42},{top:.42,bottom:.505}],parts=[];
+         const lines=[{top:.255,bottom:.335},{top:.335,bottom:.405},{top:.405,bottom:.485}],parts=[];
          for(const line of lines){
            const part=document.createElement('canvas'),py=Math.round(best.canvas.height*line.top),ph=Math.max(1,Math.round(best.canvas.height*(line.bottom-line.top)));
            part.width=crop.width;part.height=ph;
@@ -207,6 +208,7 @@ panel = r"""
            const res=await recognizeFieldCrop(part,f);if(res.text)parts.push(ocrFieldClean('application',res.text));
          }
          detected=parts.join(' ').replace(/\s+/g,' ').trim();
+         if(!/\b(vigas|travamento|pilar|laje|funda[cç][aã]o|bloco|radier|sapata|baldrame|parede)\b/i.test(detected))detected='';
        }else{
          const res=await recognizeFieldCrop(crop,f);detected=ocrFieldClean(f.key,res.text);
        }
