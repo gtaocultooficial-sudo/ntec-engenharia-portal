@@ -224,11 +224,48 @@ function ntecReportStatusText(report){
 '''
 
 rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
-"""function renderReports(){
- document.getElementById('reportsbody').innerHTML=reports.length?reports.map(r=>{
+"""function ntecRenderRuptureAlerts(){
+ const tableBody=document.getElementById('reportsbody');if(!tableBody)return;
+ const table=tableBody.closest('table');if(!table)return;
+ let panel=document.getElementById('ntec-rupture-alerts');
+ if(!panel){panel=document.createElement('section');panel.id='ntec-rupture-alerts';panel.style.cssText='display:none;margin:0 0 14px;padding:14px 16px;border:1px solid #e6b85c;border-radius:10px;background:#fff8e7;color:#573b08';table.parentNode.insertBefore(panel,table);}
+ const today=new Date();today.setHours(0,0,0,0);
+ const due=[];
+ for(const report of reports){
+  if(report.report_type!=='ruptura_concreto')continue;
+  const fields=report.structured_data?.fields||{},castingDate=String(fields.casting_date||'');
+  const cols=ntecReportMatrixColumns(),rows=ntecRuptureRows(report);
+  const ai=ntecRuptureHeaderIndex(cols,'age'),di=ntecRuptureHeaderIndex(cols,'date'),li=ntecRuptureHeaderIndex(cols,'load');
+  if(ai<0||li<0)continue;
+  rows.forEach((row,i)=>{
+   const age=ntecRuptureParseNumber(row[ai]),load=ntecRuptureParseNumber(row[li]);
+   if(!Number.isFinite(age)||age<0||load>0)return;
+   const rawDate=di>=0?String(row[di]||'').trim():'';
+   let date=null;
+   let m=rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+   if(m)date=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
+   if(!date&&/^\d{4}-\d{2}-\d{2}$/.test(castingDate)){date=new Date(castingDate+'T12:00:00');date.setDate(date.getDate()+Math.round(age));}
+   if(!date||Number.isNaN(date.getTime()))return;
+   date.setHours(0,0,0,0);
+   const days=Math.round((date-today)/86400000);
+   if(days<=3)due.push({report,cp:row[ntecRuptureHeaderIndex(cols,'cp')]||String(i+1),date,days});
+  });
+ }
+ due.sort((a,b)=>a.days-b.days);
+ if(!due.length){panel.style.display='none';panel.innerHTML='';return;}
+ panel.style.display='block';
+ const rows=due.map(item=>{
+  const label=item.days<0?'ATRASADA há '+Math.abs(item.days)+' dia(s)':item.days===0?'PREVISTA PARA HOJE':'Prevista em '+item.days+' dia(s)';
+  const color=item.days<=0?'#a12b20':'#805b09';
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #ead9b4"><strong style="color:'+color+'">'+label+'</strong><span>'+esc(item.date.toLocaleDateString('pt-BR'))+'</span><span>CP '+esc(item.cp)+'</span><span>'+esc(item.report.report_number||item.report.title||'Relatório')+'</span><span>'+esc(item.report.project||'')+'</span><button type="button" class="btn secondary" onclick="openRuptureEntry(\''+esc(item.report.id)+'\')">Lançar ruptura</button></div>';
+ }).join('');
+ panel.innerHTML='<strong>⚠️ Atenção: rupturas pendentes</strong><div style="font-size:13px;margin-top:5px">Os CPs abaixo atingiram ou estão próximos da idade prevista e ainda não têm carga de prensa registrada. A data é uma previsão; se o ensaio não foi realizado, mantenha o lançamento pendente e atualize quando ocorrer.</div>'+rows;
+}
+function renderReports(){
   const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" onclick="openRuptureEntry(\\''+esc(r.id)+'\\')">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
   return '<tr><td><strong>'+esc(r.report_number||'Número pendente')+'</strong><div>'+esc(r.title)+'</div><div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+'<button class="btn" onclick="editReport(\\''+esc(r.id)+'\\')">Editar</button> <button class="btn" onclick="printNtecReport(\\''+esc(r.id)+'\\')">PDF</button></td></tr>';
  }).join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>';
+ ntecRenderRuptureAlerts();
 }
 function matrixHtml""",'botão de lançamento de ruptura')
 once("function matrixHtml",staged_js+"\nfunction matrixHtml",'funções de lançamento posterior')
