@@ -181,7 +181,7 @@ panel = r"""
      }
      async function recognizeFieldCrop(canvas,field){
        let best={score:-1,text:''};
-       for(const mode of ['6','11','13','7']){
+       for(const mode of ['6','11']){
          await worker.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1'});
          const rr=await worker.recognize(canvas);
          const txt=String(rr.data.text||'').replace(/\s+/g,' ').trim();
@@ -214,7 +214,7 @@ panel = r"""
        }
        cropSuggestions.push({key:f.key,label:f.label,text:detected,image:crop.toDataURL('image/png')});
      }
-     const regions=[{name:'CABEÇALHO',from:0,to:0.34,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.25,to:0.82,left:0,right:1},{name:'TABELA — METADE ESQUERDA',from:0.25,to:0.82,left:0,right:0.52},{name:'TABELA — METADE DIREITA',from:0.25,to:0.82,left:0.48,right:1},{name:'TABELA — COLUNAS INICIAIS',from:0.30,to:0.80,left:0,right:0.34},{name:'TABELA — COLUNAS CENTRAIS',from:0.30,to:0.80,left:0.28,right:0.70},{name:'TABELA — COLUNAS FINAIS',from:0.30,to:0.80,left:0.64,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.76,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11','12']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\n'+regionBest.text);}const preview=document.getElementById('ntec-ocr-fields-preview');
+     const regions=[{name:'CABEÇALHO',from:0,to:0.27,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.22,to:0.80,left:0,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.75,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\n'+regionBest.text);}const preview=document.getElementById('ntec-ocr-fields-preview');
      if(preview){
        preview.innerHTML='';
        for(const field of cropSuggestions){
