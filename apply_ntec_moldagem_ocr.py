@@ -256,11 +256,76 @@ panel = r"""
    if(!date.value&&tr.querySelector('[data-cp="age"]').value)date.value=cpDateFromAge(tr.querySelector('[data-cp="age"]').value);
  }
 
- function ntecNextControlSeries(){
-   const el=document.querySelector('[data-report-field="series"]');
-   const n=Number.parseInt(el?.value||'',10);
-   return Number.isInteger(n)&&n>0?n:1;
+ function ntecDefaultControlSeries(){
+   let maximum=0;const pid=String(document.getElementById('reportproject')?.value||'');
+   const pool=Array.isArray(reports)?reports:[];
+   for(const report of pool){
+     if(pid&&String(report.project_id||report.projectId||'')!==pid)continue;
+     const sd=report.structured_data||{};
+     const serialized=JSON.stringify(sd);
+     for(const m of serialized.matchAll(/s[ée]rie\s*0*(\d+)\s*(?:\/|-)\s*cp/gi))maximum=Math.max(maximum,Number(m[1])||0);
+     const walk=(value,key='')=>{
+       if(Array.isArray(value)){value.forEach(v=>walk(v,key));return;}
+       if(value&&typeof value==='object'){
+         if(/series|s[eé]rie|controlseries/i.test(key)){
+           const n=Number.parseInt(value,10);if(Number.isInteger(n)&&n>maximum)maximum=n;
+         }
+         Object.entries(value).forEach(([k,v])=>walk(v,k));
+       }else if(typeof value==='string'&&/series|s[eé]rie|controlseries/i.test(key)){
+         const n=Number.parseInt(value,10);if(Number.isInteger(n)&&n>maximum)maximum=n;
+       }
+     };
+     walk(sd);
+   }
+   return maximum+1;
  }
+ function ntecNextControlSeries(){
+   const el=document.getElementById('ntec-cp-start-series');
+   const n=Number.parseInt(el?.value||'',10);
+   return Number.isInteger(n)&&n>0?n:ntecDefaultControlSeries();
+ }
+ function ntecRenderSeriesMetaRows(start,count){
+   const body=document.getElementById('ntec-series-meta-rows');if(!body)return;
+   const starts=['06:46','07:20','08:25','08:38','09:10','11:25','11:40','12:50','14:00','14:50'];
+   const molding=['08:15','08:40','09:15','10:00','10:21','12:21','13:30','13:21','14:55','15:40'];
+   const values=[140,130,140,120,130,130,120,140,120,120];
+   body.innerHTML='';
+   for(let i=0;i<count;i++){
+     const tr=document.createElement('tr');
+     const fields=[
+       ['series',String(start+i).padStart(2,'0')],
+       ['start-time',starts[i]||''],
+       ['molding-time',molding[i]||''],
+       ['cp-count','4'],
+       ['charge',String(values[i]??'')],
+       ['slump',String(values[i]??'')],
+       ['bt',''],
+       ['invoice',''],
+       ['volume','']
+     ];
+     tr.innerHTML=fields.map(([key,value])=>'<td><input data-series-meta="'+key+'" aria-label="'+key+'" value="'+String(value).replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"></td>').join('');
+     body.appendChild(tr);
+   }
+   ntecSyncSeriesMetadataToReport();
+ }
+ function ntecReadSeriesMetadata(){
+   return [...document.querySelectorAll('#ntec-series-meta-rows tr')].map(tr=>{
+     const read=k=>String(tr.querySelector('[data-series-meta="'+k+'"]')?.value||'').trim();
+     return {series:read('series'),startTime:read('start-time'),moldingTime:read('molding-time'),cpCount:read('cp-count'),charge:read('charge'),slump:read('slump'),bt:read('bt'),invoice:read('invoice'),volume:read('volume')};
+   });
+ }
+ function ntecSyncSeriesMetadataToReport(){
+   const rows=ntecReadSeriesMetadata();if(!rows.length)return;
+   const target=document.getElementById('reportobservations')||document.getElementById('reportresults')||document.getElementById('reportcontent');
+   if(!target)return;
+   const marker='DADOS INDIVIDUAIS POR SÉRIE — FICHA EMPREITEC';
+   const before=String(target.value||'');const keep=before.includes(marker)?before.slice(0,before.indexOf(marker)).trim():before.trim();
+   const value=x=>x||'—';
+   const lines=rows.map(r=>'Série de controle '+value(r.series)+' | horário inicial '+value(r.startTime)+' | moldagem '+value(r.moldingTime)+' | CPs '+value(r.cpCount)+' | carga/código '+value(r.charge)+' | abatimento '+value(r.slump)+' mm | BT '+value(r.bt)+' | nota fiscal '+value(r.invoice)+' | volume '+value(r.volume)+' m³');
+   target.value=(keep?keep+'\\n\\n':'')+marker+'\\n'+lines.join('\\n');
+   target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));
+ }
+ document.getElementById('ntec-series-meta-rows')?.addEventListener('input',()=>ntecSyncSeriesMetadataToReport());
  document.getElementById('ntec-cp-generate')?.addEventListener('click',()=>{
    const count=Number.parseInt(document.getElementById('ntec-cp-series-count')?.value||'',10);
    const ages=String(document.getElementById('ntec-cp-ages')?.value||'').split(/[;,]/).map(x=>Number.parseInt(x.trim(),10));
@@ -271,7 +336,13 @@ panel = r"""
    const existingRows=[...document.querySelectorAll('#ntec-cp-rows tr')];
    if(existingRows.some(tr=>['series','id','age','date','load'].some(k=>String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()))&&!confirm('Substituir as linhas de CPs que já estão na conferência?'))return;
    const body=document.getElementById('ntec-cp-rows');body.innerHTML='';
-   const start=ntecNextControlSeries();let total=0;
+   const start=ntecNextControlSeries();
+   const metaBody=document.getElementById('ntec-series-meta-rows');
+   if(metaBody){
+     if(metaBody.rows.length!==count)ntecRenderSeriesMetaRows(start,count);
+     else [...metaBody.rows].forEach((row,i)=>{const inp=row.querySelector('[data-series-meta="series"]');if(inp)inp.value=String(start+i).padStart(2,'0');});
+   }
+   let total=0;
    for(let si=0;si<count;si++){
      const controlSeries=start+si;let cpNo=1;
      ages.forEach((age,ai)=>{
@@ -282,9 +353,8 @@ panel = r"""
        }
      });
    }
-   const seriesField=document.querySelector('[data-report-field="series"]');
-   if(seriesField){seriesField.value=String(start+count-1);seriesField.dataset.ntecManualSeries='1';seriesField.dispatchEvent(new Event('input',{bubbles:true}));seriesField.dispatchEvent(new Event('change',{bubbles:true}));}
-   status('Gerados '+total+' CP(s) em '+count+' série(s) de controle, da série '+start+' à '+(start+count-1)+'. Confira a distribuição por idade e depois transfira para o relatório. Nenhuma carga real foi preenchida.');
+   ntecSyncSeriesMetadataToReport();
+   status('Gerados '+total+' CP(s) em '+count+' séries de controle, da '+String(start).padStart(2,'0')+' à '+String(start+count-1).padStart(2,'0')+'. Cada série tem '+qtys.reduce((a,b)=>a+b,0)+' CP(s). Confira os dados individuais e transfira para o relatório. A carga real da prensa continua vazia.');
  });
  document.getElementById('ntec-cp-add')?.addEventListener('click',()=>addOcrCpRow());
  document.getElementById('ntec-cp-rows')?.addEventListener('click',e=>{if(e.target.closest('[data-cp-remove]'))e.target.closest('tr')?.remove()});
