@@ -336,13 +336,79 @@ panel = r"""
    target.value=(keep?keep+'\n\n':'')+header+'\n'+marker+'\n'+lines.join('\n');
    target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));
  }
+ let ntecConfirmedMoldingPresetActive=false;
+ function ntecFormFieldNorm(value){
+   return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+ }
+ function ntecApplyMoldingDetailFields(){
+   const typeEl=document.getElementById('reporttype');
+   const holder=document.getElementById('reporttemplatefields');
+   if(!holder||!typeEl||typeEl.value!=='ruptura_concreto')return;
+   const boxes=[...holder.querySelectorAll('.field')];
+   let aggregateInput=null;
+   for(const box of boxes){
+     const el=box.querySelector('[data-report-field]');
+     if(!el)continue;
+     const label=box.querySelector('label')?.textContent||'';
+     const key=ntecFormFieldNorm(label+' '+el.dataset.reportField);
+     if(/nota fiscal|invoice|ticket|serie lote de cp|serie.*lote.*cp|prensa identificacao|prensa|certificado.*calibracao|calibracao.*validade/.test(key)){
+       box.remove();
+       continue;
+     }
+     if(/agregado|agregados|brita|granulometria/.test(key))aggregateInput=el;
+     if(!ntecConfirmedMoldingPresetActive)continue;
+     let value=null;
+     if(/fornecedor do concreto|fornecedor|supplier/.test(key))value='Supermix';
+     else if(/data da concretagem.*moldagem|data.*moldagem|casting date/.test(key))value='2026-10-16';
+     else if(/\bfck\b|resistencia caracteristica|fck especificado/.test(key))value='40';
+     else if(/dimensao dos cps|dimensoes dos cps|specimen dimensions/.test(key))value='100 x 200 mm';
+     else if(/abatimento especificado|abatimento teorico|slump theor/.test(key))value='120 ± 20';
+     else if(/peca.*elemento concretado|elemento concretado|local de aplicacao/.test(key))value='Vigas de travamento';
+     if(value!==null){
+       if(el.type==='date')el.value='2026-10-16';
+       else if(el.type==='number'&&/fck/.test(key))el.value='40';
+       else if(el.type==='number'&&/abatimento/.test(key))el.value='120';
+       else el.value=value;
+       if(/abatimento/.test(key)&&el.type==='number')el.title='Abatimento teórico: 120 mm ± 20 mm';
+       el.dispatchEvent(new Event('input',{bubbles:true}));
+       el.dispatchEvent(new Event('change',{bubbles:true}));
+     }
+   }
+   if(ntecConfirmedMoldingPresetActive&&!aggregateInput){
+     const field=document.createElement('div');field.className='field ntec-aggregate-default';
+     const label=document.createElement('label');label.textContent='Agregados (brita)';
+     const input=document.createElement('input');input.type='text';input.value='Brita 0 e Brita 1';input.dataset.reportField='aggregates';
+     label.htmlFor='ntec-aggregates-default';input.id='ntec-aggregates-default';field.appendChild(label);field.appendChild(input);
+     const dim=holder.querySelector('[data-report-field="specimen_dimensions"]')?.closest('.field');
+     if(dim&&dim.parentNode)dim.parentNode.insertBefore(field,dim.nextSibling);else holder.appendChild(field);
+     input.dispatchEvent(new Event('input',{bubbles:true}));
+   }else if(ntecConfirmedMoldingPresetActive&&aggregateInput){
+     aggregateInput.value='Brita 0 e Brita 1';
+     aggregateInput.dispatchEvent(new Event('input',{bubbles:true}));
+     aggregateInput.dispatchEvent(new Event('change',{bubbles:true}));
+   }
+ }
+ function ntecInstallMoldingDetailDefaults(){
+   ntecApplyMoldingDetailFields();
+   const holder=document.getElementById('reporttemplatefields');
+   if(holder&&!holder.dataset.ntecMoldingObserver){
+     const observer=new MutationObserver(()=>ntecApplyMoldingDetailFields());
+     observer.observe(holder,{childList:true,subtree:true});
+     holder.dataset.ntecMoldingObserver='1';
+   }
+ }
+ if(document.readyState==='complete')ntecInstallMoldingDetailDefaults();
+ else window.addEventListener('load',ntecInstallMoldingDetailDefaults,{once:true});
+ document.getElementById('reporttype')?.addEventListener('change',()=>window.setTimeout(ntecApplyMoldingDetailFields,0));
  document.getElementById('ntec-cp-use-form02')?.addEventListener('click',()=>{
    const staged=[...document.querySelectorAll('#ntec-cp-rows tr')];
    const hasStaged=staged.some(tr=>['series','id','age','date','load'].some(k=>String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()));
    if(hasStaged&&!confirm('Substituir os CPs que já estão na conferência pelo padrão de 10 séries desta ficha?'))return;
    if(hasStaged){const stagedBody=document.getElementById('ntec-cp-rows');if(stagedBody)stagedBody.innerHTML='';}
+   ntecConfirmedMoldingPresetActive=true;
    const typeEl=document.getElementById('reporttype');
    if(typeEl&&[...typeEl.options].some(o=>o.value==='ruptura_concreto')){typeEl.value='ruptura_concreto';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
+   window.setTimeout(ntecApplyMoldingDetailFields,0);
    const projectSelect=document.getElementById('reportproject');
    if(projectSelect&&typeof projectsData!=='undefined'){
      const candidates=projectsData.filter(p=>String(p.work_number||'').replace(/\D/g,'')==='1408');
