@@ -11,10 +11,10 @@ replacement = r"""function printNtecReport(id){
  const type=r.report_type||'outro';
  const tpl=REPORT_TEMPLATES[type]||REPORT_TEMPLATES.outro||{};
  const sd=r.structured_data||{},fields=sd.fields||{},tables=sd.matrix||{};
- const reportNumber=r.report_number||fields.report_number||'Não informado';
  const revisionMeta=sd.revision&&typeof sd.revision==='object'?sd.revision:{};
  const revisionNumber=Math.max(0,Number(revisionMeta.number??fields.report_revision_number??0)||0);
  const revisionParent=String(revisionMeta.parent_report_number||fields.report_revision_of_number||'').trim();
+ const reportNumber=revisionNumber>0?String(revisionMeta.display_number||('RV'+String(revisionNumber).padStart(2,'0')+' - '+(revisionParent||r.report_number||fields.report_number||'Não informado'))):(r.report_number||fields.report_number||'Não informado');
  const workCode=r.work_number?'OBRA'+String(r.work_number).padStart(3,'0'):(fields.record_number||'Não informado');
  const dateValue=r.report_date||'';
  const fmtDate=value=>{
@@ -69,7 +69,7 @@ replacement = r"""function printNtecReport(id){
   {label:'DATA DO RELATÓRIO',value:fmtDate(dateValue)},
   {label:'STATUS',value:initialSevenDayIssue?'Emissão inicial — resultados de 7 dias':revisionNumber>0?'Revisão '+String(revisionNumber).padStart(2,'0')+' — resultados de 7 e 28 dias':(typeof ntecReportStatusText==='function'?ntecReportStatusText(r):(r.statusLabel||r.status||'Rascunho'))},
   {label:'FORNECEDOR',value:fields.supplier||fields.concrete_supplier||fields.vendor||'—'},
-  ...(revisionNumber>0?[{label:'REVISÃO',value:'Revisão '+String(revisionNumber).padStart(2,'0')},{label:'RELATÓRIO ORIGINAL',value:revisionParent||'Não informado'}]:[])
+  ...(revisionNumber>0?[{label:'VERSÃO',value:'RV'+String(revisionNumber).padStart(2,'0')+' — relatório revisado'},{label:'RELATÓRIO ORIGINAL',value:revisionParent||'Não informado'}]:[])
  ];
  const fieldDefs=(tpl.fields||[]).filter(f=>!['report_number','record_number','series'].includes(f.name)&&String(fields[f.name]??'').trim()!=='');
  const detailPairs=fieldDefs.map(f=>({label:f.label,value:fmtValue(f,fields[f.name])}));
