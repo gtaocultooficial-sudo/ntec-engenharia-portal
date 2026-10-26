@@ -49,7 +49,7 @@ panel = r"""
    });
  }
  async function getPages(file){
-   if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf')return [await createImageBitmap(file)];
+   if(!/\.pdf$/i.test(file.name)&&file.type!=='application/pdf'){const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;canvas.getContext('2d').drawImage(bitmap,0,0);bitmap.close?.();return [canvas];}
    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',()=>!!window.pdfjsLib);
    const pdfjs=window.pdfjsLib;pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
    const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise,pages=[];
@@ -71,7 +71,7 @@ panel = r"""
      status('Preparando o reconhecimento em português…');
      const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
-     try{for(let i=0;i<pages.length;i++){status('Lendo página '+(i+1)+' de '+pages.length+'…');const result=await worker.recognize(pages[i]);output.push('--- Página '+(i+1)+' ---\n'+result.data.text);if(typeof ImageBitmap!=='undefined'&&pages[i] instanceof ImageBitmap)pages[i].close?.();}}
+     try{for(let i=0;i<pages.length;i++){status('Lendo página '+(i+1)+' de '+pages.length+'…');const result=await worker.recognize(pages[i]);output.push('--- Página '+(i+1)+' ---\n'+result.data.text);}}
      finally{await worker.terminate();}
      textEl.value=output.join('\n\n');status('Leitura concluída. Confira o texto; a escrita manual pode gerar erros. Clique em “Aplicar sugestões” para preencher os campos reconhecidos.');
    }catch(e){const detail=(e&&typeof e.message==='string'&&e.message.trim())?e.message:(typeof e==='string'?e:(e&&e.name?e.name+' (verifique conexão, bloqueio de CDN ou formato do arquivo)':String(e)));status('Falha na leitura automática: '+detail+'. Tente JPG/PNG ou PDF menor que 20 MB; se persistir, envie a mensagem exata para diagnóstico.');console.error('NTEC OCR error:',e);}
