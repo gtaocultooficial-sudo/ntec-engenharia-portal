@@ -134,8 +134,30 @@ replacement = r"""function printNtecReport(id){
   const developing=points.length<2?'<div class="n-chart-note">Curva em formação: há resultado para apenas uma idade. Registre outros rompimentos para visualizar a evolução ao longo do tempo.</div>':'';
   return sectionTitle+'<div class="n-chart">'+svg+'<div class="n-chart-caption">Média aritmética dos CPs com resistência registrada em cada idade. '+esc(averageDetails)+'.</div>'+developing+'</div>';
  };
- const growthChartHtml=ntecGrowthChart(tables.primary,tpl.matrix?.columns);
+ const ntecInitialIssueMatrix=(text,columns)=>{
+  const raw=String(text||'').trim();if(!raw||type!=='ruptura_concreto'||revisionNumber>0)return raw;
+  const rows=raw.split(/\r?\n/).filter(Boolean).map(line=>line.split('|').map(v=>v.trim()));
+  const normalize=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const ageIndex=(columns||[]).findIndex(col=>normalize(col).includes('idade'));
+  if(ageIndex<0)return raw;
+  const ages=rows.map(row=>Number(String(row[ageIndex]||'').replace(',','.')));
+  return ages.includes(7)&&ages.includes(28)?rows.filter(row=>Number(String(row[ageIndex]||'').replace(',','.'))===7).map(row=>row.join(' | ')).join('\n'):raw;
+ };
+ const chartMatrix=ntecInitialIssueMatrix(tables.primary,tpl.matrix?.columns);
+ const growthChartHtml=ntecGrowthChart(chartMatrix,tpl.matrix?.columns);
  let resultSummary=String(r.results||'').trim();
+ if(type==='ruptura_concreto'&&revisionNumber===0){
+   const rawRows=String(tables.primary||'').trim().split(/\r?\n/).filter(Boolean).map(line=>line.split('|').map(v=>v.trim()));
+   const normAge=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+   const ageIndex=(tpl.matrix?.columns||[]).findIndex(col=>normAge(col).includes('idade'));
+   if(ageIndex>=0){
+     const ages=rawRows.map(row=>Number(String(row[ageIndex]||'').replace(',','.')));
+     if(ages.includes(7)&&ages.includes(28)){
+       const ageSevenRows=rawRows.filter(row=>Number(String(row[ageIndex]||'').replace(',','.'))===7);
+       resultSummary=ntecRuptureSummary(ageSevenRows,tpl.matrix.columns);
+     }
+   }
+ }
  if(resultSummary.startsWith('Dados de ensaio registrados na ficha:')){
   resultSummary=resultSummary.split(String.fromCharCode(10)).filter(line=>line.startsWith('Resumo numérico das resistências')||line.startsWith('Resumo numérico')).join(String.fromCharCode(10));
  }
