@@ -20,11 +20,24 @@ panel = r"""
   <label for="ntec-ocr-text">Texto reconhecido (confira e corrija antes de aplicar)</label>
   <textarea id="ntec-ocr-text" rows="7" placeholder="O texto extraído da ficha aparecerá aqui para conferência."></textarea>
   <button type="button" class="btn secondary" id="ntec-ocr-apply">Aplicar sugestões aos campos</button>
+  <hr>
+  <h4>Conferência dos corpos de prova (CPs)</h4>
+  <p>Revise os CPs da ficha nesta tabela. A data prevista é sugerida pela data de moldagem + idade; você pode corrigir manualmente. Só transfira as linhas depois de conferir.</p>
+  <div class="ntec-ocr-controls"><button type="button" class="btn secondary" id="ntec-cp-add">+ Adicionar CP</button><button type="button" class="btn secondary" id="ntec-cp-transfer">Transferir CPs conferidos para o relatório</button></div>
+  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Série / CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga (tf), se já houver</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
+  <small>Não preenchemos automaticamente números duvidosos da escrita manual. Os resultados reais de ruptura devem ser lançados somente após o ensaio.</small>
   <small>O arquivo é processado no navegador e não é enviado a um serviço externo de OCR. É necessária conexão para carregar as bibliotecas de leitura.</small>
 </div>
 <style>
 .ntec-ocr-card{border:1px solid var(--line);border-radius:12px;padding:15px;margin:0 0 16px;background:#f7fafc}
 .ntec-ocr-card h3{margin:0 0 6px;color:var(--navy);font-size:16px}
+.ntec-ocr-card h4{margin:12px 0 5px;color:var(--navy);font-size:14px}
+.ntec-cp-table-wrap{overflow-x:auto;margin:8px 0}
+.ntec-cp-table{width:100%;border-collapse:collapse;min-width:620px}
+.ntec-cp-table th,.ntec-cp-table td{border:1px solid #d5dee7;padding:6px;text-align:left;font-size:12px}
+.ntec-cp-table th{background:#eaf0f5}
+.ntec-cp-table input{width:100%;min-width:85px;padding:7px;border:1px solid #cbd6e1;border-radius:5px;box-sizing:border-box}
+.ntec-cp-table input[data-cp-date="1"]{background:#eef5fb}
 .ntec-ocr-card p,.ntec-ocr-card small{display:block;color:#526579;font-size:12px;line-height:1.5}
 .ntec-ocr-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .ntec-ocr-card input[type=file]{max-width:100%;padding:8px}
@@ -104,6 +117,42 @@ panel = r"""
      textEl.value=output.join('\n\n');status('Leitura concluída. Confira o texto; a escrita manual pode gerar erros. Clique em “Aplicar sugestões” para preencher os campos reconhecidos.');
    }catch(e){const detail=(e&&typeof e.message==='string'&&e.message.trim())?e.message:(typeof e==='string'?e:(e&&e.name?e.name+' (verifique conexão, bloqueio de CDN ou formato do arquivo)':String(e)));status('Falha na leitura automática: '+detail+'. Tente JPG/PNG ou PDF menor que 20 MB; se persistir, envie a mensagem exata para diagnóstico.');console.error('NTEC OCR error:',e);}
    finally{readBtn.disabled=false;}
+ });
+ function cpDateFromAge(age){
+   const cast=document.querySelector('[data-report-field="casting_date"]')?.value;
+   const n=Number(String(age||'').replace(',','.'));
+   if(!cast||!Number.isFinite(n)||n<0)return '';
+   const d=new Date(cast+'T12:00:00');d.setDate(d.getDate()+Math.round(n));
+   return Number.isNaN(d.getTime())?'':String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+ }
+ function addOcrCpRow(values={}){
+   const body=document.getElementById('ntec-cp-rows');if(!body)return;
+   const tr=document.createElement('tr');
+   tr.innerHTML='<td><input data-cp="id" aria-label="Série ou CP" placeholder="Série / CP"></td><td><input data-cp="age" type="number" min="0" step="1" aria-label="Idade em dias" placeholder="7 / 28"></td><td><input data-cp="date" aria-label="Data prevista" placeholder="dd/mm/aaaa"></td><td><input data-cp="load" inputmode="decimal" aria-label="Carga em tf" placeholder="Opcional"></td><td><button type="button" class="btn secondary" data-cp-remove aria-label="Remover CP">×</button></td>';
+   body.appendChild(tr);
+   for(const k of ['id','age','date','load']){const el=tr.querySelector('[data-cp="'+k+'"]');if(el&&values[k]!=null)el.value=values[k];}
+   const date=tr.querySelector('[data-cp="date"]');date.dataset.cpDate='1';
+   if(!date.value&&tr.querySelector('[data-cp="age"]').value)date.value=cpDateFromAge(tr.querySelector('[data-cp="age"]').value);
+ }
+ document.getElementById('ntec-cp-add')?.addEventListener('click',()=>addOcrCpRow());
+ document.getElementById('ntec-cp-rows')?.addEventListener('click',e=>{if(e.target.closest('[data-cp-remove]'))e.target.closest('tr')?.remove()});
+ document.getElementById('ntec-cp-rows')?.addEventListener('input',e=>{
+   if(e.target.matches('[data-cp="age"]')){const row=e.target.closest('tr'),date=row?.querySelector('[data-cp="date"]');if(date&&!date.dataset.manual)date.value=cpDateFromAge(e.target.value);}
+   if(e.target.matches('[data-cp="date"]'))e.target.dataset.manual='1';
+ });
+ document.getElementById('ntec-cp-transfer')?.addEventListener('click',()=>{
+   const rows=[...document.querySelectorAll('#ntec-cp-rows tr')].map(tr=>Object.fromEntries(['id','age','date','load'].map(k=>[k,String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()])));
+   const valid=rows.filter(r=>r.id||r.age||r.date||r.load);
+   if(!valid.length){status('Adicione e confira ao menos um CP antes de transferir.');return;}
+   if(document.getElementById('reporttype')?.value!=='ruptura_concreto'){status('Selecione o tipo “Ruptura de concreto” para transferir CPs.');return;}
+   if(typeof matrixDefinition!=='function'||typeof addReportMatrixRow!=='function'){status('A tabela do relatório não está disponível. Reabra o formulário e tente novamente.');return;}
+   const def=matrixDefinition('primary');if(!def?.columns?.length){status('Não foi possível identificar as colunas do relatório.');return;}
+   const normHeader=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+   const idx=terms=>def.columns.findIndex(col=>terms.some(t=>normHeader(col).includes(t)));
+   const ix={id:idx(['cp nº','cp n°','cp','amostra']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
+   if(ix.id<0||ix.age<0||ix.date<0||ix.load<0){status('As colunas de CP, idade, data de ruptura e carga (tf) não foram encontradas na tabela do relatório. Nada foi transferido.');return;}
+   valid.forEach(r=>{const vals=Array(def.columns.length).fill('');vals[ix.id]=r.id;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);});
+   status(valid.length+' CP(s) transferido(s) para a tabela do relatório. Confira as datas, as idades e as cargas antes de salvar.');
  });
  function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
  function valueAfter(text,labels){
