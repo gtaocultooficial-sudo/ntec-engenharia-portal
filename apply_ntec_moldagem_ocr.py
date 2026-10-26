@@ -79,14 +79,14 @@ panel = r"""
    return variants;
  }
  function ocrScore(text,confidence){
-   const raw=String(text||''),t=raw.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
+   const raw=String(text||''),t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
    // Pontua rótulos próprios do FORM02 para escolher orientação legível.
    const anchors=['formulario de moldagem','codigo da obra','n serie campo','n serie controle','construtora','caracteristica do material','abatimento teorico','local de aplicacao','idades de ruptura','horario do moldador','total de cps coletados','recepcao no laboratorio','fornecedor','quantidade cps','moldagem','form02'];
    let score=anchors.reduce((n,w)=>n+(t.includes(w)?12:0),0);
    const words=(raw.match(/[A-Za-zÀ-ÿ]{3,}/g)||[]).length;
    const chars=(raw.match(/[A-Za-zÀ-ÿ]/g)||[]).length;
-   const digits=(raw.match(/\\d/g)||[]).length;
-   const junk=(raw.match(/[|{}~\\[\\]<>]/g)||[]).length;
+   const digits=(raw.match(/\d/g)||[]).length;
+   const junk=(raw.match(/[|{}~<>]/g)||[]).length;
    score+=Math.min(words,100)*0.22+Math.min(chars/60,10)+Math.min(digits,80)*0.05;
    score+=(chars/Math.max(1,raw.length))*12;
    score-=junk*0.5;
@@ -138,7 +138,7 @@ panel = r"""
        for(const mode of ['7','6']){
          await worker.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1'});
          const rr=await worker.recognize(crop);
-         const txt=String(rr.data.text||'').replace(/\\s+/g,' ').trim();
+         const txt=String(rr.data.text||'').replace(/\s+/g,' ').trim();
          const sc=ocrScore(txt,rr.data.confidence);
          if(sc>cellBest.score)cellBest={score:sc,text:txt};
        }
@@ -223,9 +223,9 @@ panel = r"""
    for(const el of fields){const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||el.dataset.reportField;const key=norm(label+' '+el.dataset.reportField);let labels=[];if(/fornecedor|supplier/.test(key))labels=['fornecedor'];else if(/nota fiscal|invoice/.test(key))labels=['nota fiscal','nf'];else if(/caminhao|betonada|bt numero/.test(key))labels=['caminhao','bt'];else if(/lote|batch/.test(key))labels=['lote','batch'];else if(/fck|resistencia caracteristica/.test(key))labels=['fck'];else if(/abatimento teorico|slump teorico/.test(key))labels=['abatimento teorico'];else if(/abatimento|slump/.test(key))labels=['abatimento','slump'];else if(/local de aplicacao|elemento estrutural|aplicacao/.test(key))labels=['local de aplicacao'];else if(/volume/.test(key))labels=['volume'];else if(/identificacao|codigo.*obra|work number/.test(key))labels=['identificacao da obra','codigo da obra'];if(labels.length){const v=valueAfter(t,labels);if(v&&fillField(el,v))filled++;}}
    const material=norm(valueAfter(t,['caracteristica do material'])),typeEl=document.getElementById('reporttype');
    // The blank template prints all three material choices. Change the report type only if the crop OCR sees an explicit check mark.
-   const checkedConcrete=/concreto.{0,12}(?:\\bx\\b|✓|✔|☒|☑)/i.test(material);
-   const checkedMortar=/argamassa.{0,12}(?:\\bx\\b|✓|✔|☒|☑)/i.test(material);
-   const checkedGrout=/graute.{0,12}(?:\\bx\\b|✓|✔|☒|☑)/i.test(material);
+   const checkedConcrete=/concreto.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
+   const checkedMortar=/argamassa.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
+   const checkedGrout=/graute.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
    const selectedType=checkedConcrete&&!checkedMortar&&!checkedGrout?'ruptura_concreto':checkedMortar&&!checkedConcrete&&!checkedGrout?'compressao_argamassa':checkedGrout&&!checkedConcrete&&!checkedMortar?'graute_alvenaria':'';
    if(typeEl&&selectedType&&[...typeEl.options].some(o=>o.value===selectedType)){typeEl.value=selectedType;typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
    status('Sugestões aplicadas: '+filled+' campo(s). A leitura agora prioriza recortes separados dos campos; confira os valores e a tabela antes de salvar. O tipo do material só é alterado quando a marcação do formulário é inequívoca.');
