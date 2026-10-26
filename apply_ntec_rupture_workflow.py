@@ -283,50 +283,36 @@ function ntecExistingRevisionFor(report){
 }
 async function createRuptureRevision(reportId){
  const report=reports.find(item=>String(item.id)===String(reportId));
- if(!report||report.report_type!=='ruptura_concreto')return alert('A revisão está disponível para relatórios de ruptura de concreto.');
- if(Number(report.structured_data?.revision?.number||report.structured_data?.fields?.report_revision_number||0)>0)return alert('Este documento já é uma revisão. Crie novas revisões a partir do relatório original para manter o histórico.');
- const prior=ntecExistingRevisionFor(report);
- if(prior)return alert('A revisão já existe: '+ntecReportDisplayNumber(prior)+'. Abra essa linha para consultar ou emitir o PDF.');
- const progress=ntecRuptureRevisionProgress(report);
- if(!progress.ready)return alert('Ainda não é possível emitir a revisão 7 + 28 dias. Faltam resultados reais em '+progress.missing+' CP(s) de 7/28 dias. Lance a carga da prensa e confira a resistência de todos os CPs dessas idades primeiro.');
- if(!confirm('Criar uma cópia revisada do relatório '+(report.report_number||'')+' contendo os resultados de 7 e 28 dias? O relatório original será preservado.'))return;
+ if(!report)return alert('Relatório não encontrado.');
+ if(Number(report.structured_data?.revision?.number||report.structured_data?.fields?.report_revision_number||0)>0)return alert('Para preservar o histórico, crie a próxima revisão a partir do relatório original.');
+ const reason=prompt('Motivo da revisão do relatório '+(report.report_number||'')+':');
+ if(reason===null)return;
+ if(!reason.trim())return alert('Informe o motivo da revisão.');
+ const prior=reports.filter(item=>String(item.structured_data?.revision?.parent_report_id||'')===String(report.id));
+ const nextNumber=prior.reduce((n,item)=>Math.max(n,Number(item.structured_data?.revision?.number||0)),0)+1;
+ if(!confirm('Criar revisão '+String(nextNumber).padStart(2,'0')+'? O original e as revisões anteriores serão preservados. A nova revisão ficará como rascunho para conferência e autorização antes da emissão.'))return;
  const button=[...document.querySelectorAll('[data-rp-revision]')].find(el=>String(el.dataset.rpRevision)===String(report.id));
  if(button){button.disabled=true;button.textContent='Criando revisão…';}
  try{
-   const data=JSON.parse(JSON.stringify(report.structured_data||{}));
-   data.fields=data.fields||{};
-   data.revision={number:1,display_number:'RV01 - '+(report.report_number||'Relatório'),parent_report_id:report.id,parent_report_number:report.report_number||'',issued_at:new Date().toISOString(),ages:[7,28]};
-   data.fields.report_revision_number=1;
-   data.fields.report_revision_of_number=report.report_number||'';
-   data.fields.report_revision_of_id=report.id;
-   const columns=ntecReportMatrixColumns(),rows=ntecRuptureRows(report);
-   const results=ntecRuptureSummary(rows,columns);
-   const revisionTitle=String(report.title||'Relatório de ruptura');
-   const note='REVISÃO 01 — consolida os resultados de 7 e 28 dias. Documento de origem: '+(report.report_number||'relatório original')+'. O relatório original foi preservado no histórico.';
-   const observations=String(report.observations||'').trim();
-   const saved=await window.NTEC_SUPABASE.saveReport({
-     projectId:report.project_id,title:revisionTitle,type:report.report_type,date:new Date().toISOString().slice(0,10),
-     content:report.content||'',methodology:report.methodology||'',results,
-     observations:(observations?observations+String.fromCharCode(10)+String.fromCharCode(10):'')+note,
-     technicalResponsible:report.technical_responsible||'',professionalRegistration:report.professional_registration||'',
-     normativeReferences:report.normative_references||'',structuredData:data,status:'concluido'
-   });
-   reports=await window.NTEC_SUPABASE.loadReports();renderReports();
-   const created=reports.find(item=>String(item.id)===String(saved?.id||'')||String(item.structured_data?.revision?.parent_report_id||'')===String(report.id));
-   alert('Revisão criada: '+(created?ntecReportDisplayNumber(created):('RV01 - '+(report.report_number||'Relatório')))+'. O documento tem o mesmo número-base do original, inclui 7 e 28 dias, e ambos permanecem no histórico.');
- }catch(err){
-   alert('Não foi possível criar a revisão: '+(err?.message||'erro desconhecido'));
-   if(button){button.disabled=false;button.textContent='Gerar revisão 7 + 28 dias';}
- }
+  const data=JSON.parse(JSON.stringify(report.structured_data||{}));
+  data.fields=data.fields||{};
+  data.revision={number:nextNumber,display_number:'RV'+String(nextNumber).padStart(2,'0')+' - '+(report.report_number||'Relatório'),parent_report_id:report.id,parent_report_number:report.report_number||'',issued_at:new Date().toISOString(),reason:reason.trim(),status:'rascunho',source_status:report.status||''};
+  data.fields.report_revision_number=nextNumber; data.fields.report_revision_of_number=report.report_number||''; data.fields.report_revision_of_id=report.id;
+  const note='REVISÃO '+String(nextNumber).padStart(2,'0')+' — motivo: '+reason.trim()+'. Documento de origem: '+(report.report_number||'relatório original')+'. Revisão criada como rascunho; requer conferência e autorização antes da emissão. O original permanece preservado.';
+  const observations=String(report.observations||'').trim();
+  const saved=await window.NTEC_SUPABASE.saveReport({projectId:report.project_id,title:report.title||'Relatório técnico',type:report.report_type,date:new Date().toISOString().slice(0,10),content:report.content||'',methodology:report.methodology||'',results:report.results||'',observations:(observations?observations+String.fromCharCode(10)+String.fromCharCode(10):'')+note,technicalResponsible:report.technical_responsible||'',professionalRegistration:report.professional_registration||'',normativeReferences:report.normative_references||'',structuredData:data,status:'rascunho'});
+  reports=await window.NTEC_SUPABASE.loadReports();renderReports();
+  const created=reports.find(item=>String(item.id)===String(saved?.id||'')||(String(item.structured_data?.revision?.parent_report_id||'')===String(report.id)&&Number(item.structured_data?.revision?.number||0)===nextNumber));
+  alert('Revisão '+String(nextNumber).padStart(2,'0')+' criada como rascunho: '+(created?ntecReportDisplayNumber(created):'aguardando atualização da lista')+'. Confira os dados e autorize antes de emitir.');
+ }catch(err){alert('Não foi possível criar a revisão: '+(err?.message||'erro desconhecido'));if(button){button.disabled=false;button.textContent='Criar revisão';}}
 }
 function renderReports(){
  const body=document.getElementById('reportsbody');
  body.innerHTML=reports.length?reports.map(r=>{
   const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" data-rp-report="'+esc(r.id)+'">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
   const revisionNumber=Number(r.structured_data?.revision?.number||r.structured_data?.fields?.report_revision_number||0);
-  const priorRevision=revisionNumber===0&&r.report_type==='ruptura_concreto'?ntecExistingRevisionFor(r):null;
-  const revisionProgress=revisionNumber===0&&r.report_type==='ruptura_concreto'?ntecRuptureRevisionProgress(r):null;
-  const revisionButton=revisionNumber>0?'<span class="muted small">Revisão '+String(revisionNumber).padStart(2,'0')+'</span> ':priorRevision?'<span class="muted small">Revisão 01 já criada</span> ':revisionProgress?'<button class="btn secondary" data-rp-revision="'+esc(r.id)+'" '+(revisionProgress.ready?'':'disabled')+' title="'+(revisionProgress.ready?'Criar documento revisado com os resultados de 7 e 28 dias':'Faltam '+revisionProgress.missing+' resultados reais de CPs aos 7/28 dias')+'">'+(revisionProgress.ready?'Gerar revisão 7 + 28 dias':'Revisão 7 + 28 dias ('+revisionProgress.missing+' pendentes)')+'</button> ':'';
+  const priorRevision=revisionNumber===0?ntecExistingRevisionFor(r):null;
+  const revisionButton=revisionNumber>0?'<span class="muted small">Revisão '+String(revisionNumber).padStart(2,'0')+'</span> ':priorRevision?'<span class="muted small">Revisão já criada</span> ':'<button class="btn secondary" data-rp-revision="'+esc(r.id)+'">Criar revisão</button> ';
   return '<tr><td><strong>'+esc(ntecReportDisplayNumber(r))+'</strong><div>'+esc(r.title)+'</div>'+'<div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+revisionButton+'<button class="btn" data-rp-edit="'+esc(r.id)+'">Editar</button> <button class="btn" data-rp-pdf="'+esc(r.id)+'">PDF</button></td></tr>';
  }).join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>';
  body.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
