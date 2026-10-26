@@ -139,7 +139,7 @@ function ntecRuptureSummary(rows,cols){
 function ntecRuptureModalRow(values,columns,index){
  const ix={cp:ntecRuptureHeaderIndex(columns,'cp'),age:ntecRuptureHeaderIndex(columns,'age'),date:ntecRuptureHeaderIndex(columns,'date'),load:ntecRuptureHeaderIndex(columns,'load'),resistance:ntecRuptureHeaderIndex(columns,'resistance')};
  const cp=ix.cp>=0?values[ix.cp]:(index+1),age=ix.age>=0?values[ix.age]:'',load=ix.load>=0?values[ix.load]:'';
- return '<tr data-ntec-rupture-row><td><input data-rp="cp" aria-label="Identificação do corpo de prova" value="'+esc(cp||'')+'" placeholder="CP '+(index+1)+'"></td><td><input data-rp="age" aria-label="Idade em dias" type="number" min="0" step="1" value="'+esc(age||'')+'" placeholder="7 / 28"></td><td><input data-rp="date" aria-label="Data de ruptura" readonly value="'+esc(ix.date>=0?values[ix.date]:'')+'"></td><td><input data-rp="load" aria-label="Carga da prensa em tf" inputmode="decimal" value="'+esc(load||'')+'" placeholder="Leitura em tf"></td><td><input data-rp="resistance" aria-label="Resistência MPa calculada" readonly value="'+esc(ix.resistance>=0?values[ix.resistance]:'')+'"></td><td><button type="button" data-rp-remove title="Remover linha">×</button></td></tr>';
+ return '<tr data-ntec-rupture-row><td><input data-rp="cp" aria-label="Identificação do corpo de prova" value="'+esc(cp||'')+'" placeholder="CP '+(index+1)+'"></td><td><input data-rp="age" aria-label="Idade em dias" type="number" min="0" step="1" value="'+esc(age||'')+'" placeholder="7 / 28"></td><td><input data-rp="date" aria-label="Data de ruptura (pode ser ajustada manualmente)" placeholder="dd/mm/aaaa" value="'+esc(ix.date>=0?values[ix.date]:'')+'"></td><td><input data-rp="load" aria-label="Carga da prensa em tf" inputmode="decimal" value="'+esc(load||'')+'" placeholder="Leitura em tf"></td><td><input data-rp="resistance" aria-label="Resistência MPa calculada" readonly value="'+esc(ix.resistance>=0?values[ix.resistance]:'')+'"></td><td><button type="button" data-rp-remove title="Remover linha">×</button></td></tr>';
 }
 function openRuptureEntry(reportId){
  const report=reports.find(r=>String(r.id)===String(reportId));
@@ -158,11 +158,11 @@ function openRuptureEntry(reportId){
  const syncRow=row=>{
   const age=row.querySelector('[data-rp="age"]')?.value||'',load=row.querySelector('[data-rp="load"]')?.value||'';
   const date=row.querySelector('[data-rp="date"]'),res=row.querySelector('[data-rp="resistance"]');
-  if(date)date.value=ntecRuptureFormatDateFromAge(castingDate,age);
+  if(date&&!date.dataset.manual){const predicted=ntecRuptureFormatDateFromAge(castingDate,age);if(predicted)date.value=predicted;}
   if(res)res.value=load.trim()?ntecRuptureCalculateResistance(load,fields):'';
  };
  const wireRow=row=>{
-  row.querySelector('[data-rp="age"]')?.addEventListener('input',()=>syncRow(row));
+  const dateInput=row.querySelector('[data-rp="date"]');if(dateInput&&dateInput.value.trim())dateInput.dataset.manual='true';dateInput?.addEventListener('input',()=>{dateInput.dataset.manual='true';});row.querySelector('[data-rp="age"]')?.addEventListener('input',()=>syncRow(row));
   row.querySelector('[data-rp="load"]')?.addEventListener('input',()=>syncRow(row));
   row.querySelector('[data-rp-remove]')?.addEventListener('click',()=>{if(body.querySelectorAll('[data-ntec-rupture-row]').length>1)row.remove();else row.querySelectorAll('input').forEach(input=>input.value='');});
   syncRow(row);
