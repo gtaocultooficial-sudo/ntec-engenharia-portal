@@ -130,15 +130,15 @@ panel = r"""
      const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
      try{for(let i=0;i<pages.length;i++){status('Preparando página '+(i+1)+' de '+pages.length+'…');const variants=makeOcrVariants(pages[i]);let best={score:-1,text:'',angle:0,mode:'6'};for(const variant of variants){for(const mode of ['6','11','12']){status('Lendo página '+(i+1)+' — rotação '+variant.angle+'°, modo '+mode+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const result=await worker.recognize(variant.canvas);const score=ocrScore(result.data.text,result.data.confidence);if(score>best.score)best={score,text:result.data.text,angle:variant.angle,mode,canvas:variant.canvas};}}const fieldCrops=[
-       {key:'work_code',label:'Código da obra',left:.485,right:.615,top:.045,bottom:.135},
-       {key:'casting_date',label:'Data da moldagem',left:.575,right:.765,top:.045,bottom:.135},
-       {key:'contractor',label:'Construtora',left:.085,right:.255,top:.135,bottom:.205},
-       {key:'address',label:'Endereço',left:.285,right:.425,top:.135,bottom:.205},
-       {key:'supplier',label:'Fornecedor',left:.405,right:.535,top:.175,bottom:.245},
-       {key:'material',label:'Característica do material',left:.075,right:.31,top:.16,bottom:.225},
-       {key:'fck',label:'FCK',left:.045,right:.165,top:.195,bottom:.26},
-       {key:'slump',label:'Abatimento teórico',left:.265,right:.405,top:.195,bottom:.26},
-       {key:'application',label:'Local de aplicação',left:.255,right:.525,top:.34,bottom:.52}
+       {key:'work_code',label:'Código da obra',left:.585,right:.715,top:.065,bottom:.155},
+       {key:'casting_date',label:'Data da moldagem',left:.715,right:.875,top:.065,bottom:.155},
+       {key:'contractor',label:'Construtora',left:.085,right:.285,top:.155,bottom:.205},
+       {key:'address',label:'Endereço',left:.285,right:.425,top:.155,bottom:.205},
+       {key:'supplier',label:'Fornecedor',left:.475,right:.615,top:.19,bottom:.255},
+       {key:'material',label:'Característica do material',left:.075,right:.39,top:.185,bottom:.255},
+       {key:'fck',label:'FCK',left:.11,right:.205,top:.22,bottom:.275},
+       {key:'slump',label:'Abatimento teórico',left:.28,right:.425,top:.205,bottom:.255},
+       {key:'application',label:'Local de aplicação',left:.265,right:.515,top:.265,bottom:.66}
      ];
      const cropSuggestions=[];
      for(const f of fieldCrops){
