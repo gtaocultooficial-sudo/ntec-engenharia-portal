@@ -22,9 +22,9 @@ panel = r"""
   <button type="button" class="btn secondary" id="ntec-ocr-apply">Aplicar sugestões aos campos</button>
   <hr>
   <h4>Conferência dos corpos de prova (CPs)</h4>
-  <p>Revise os CPs da ficha nesta tabela. A data prevista é sugerida pela data de moldagem + idade; você pode corrigir manualmente. Só transfira as linhas depois de conferir.</p>
+  <p>Cada linha da ficha original representa uma <b>série de moldagem</b>. Cadastre a série uma vez e informe abaixo cada CP dessa série, com sua idade e previsão de ruptura. A previsão não é a data real do ensaio; resultados podem ser lançados depois, inclusive parcialmente.</p>
   <div class="ntec-ocr-controls"><button type="button" class="btn secondary" id="ntec-cp-add">+ Adicionar CP</button><button type="button" class="btn secondary" id="ntec-cp-transfer">Transferir CPs conferidos para o relatório</button></div>
-  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Série / CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga (tf), se já houver</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
+  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Série da moldagem</th><th>Identificação do CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga real (tf), se ensaiado</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
   <small>Não preenchemos automaticamente números duvidosos da escrita manual. Os resultados reais de ruptura devem ser lançados somente após o ensaio.</small>
   <small>O arquivo é processado no navegador e não é enviado a um serviço externo de OCR. É necessária conexão para carregar as bibliotecas de leitura.</small>
 </div>
@@ -128,9 +128,9 @@ panel = r"""
  function addOcrCpRow(values={}){
    const body=document.getElementById('ntec-cp-rows');if(!body)return;
    const tr=document.createElement('tr');
-   tr.innerHTML='<td><input data-cp="id" aria-label="Série ou CP" placeholder="Série / CP"></td><td><input data-cp="age" type="number" min="0" step="1" aria-label="Idade em dias" placeholder="7 / 28"></td><td><input data-cp="date" aria-label="Data prevista" placeholder="dd/mm/aaaa"></td><td><input data-cp="load" inputmode="decimal" aria-label="Carga em tf" placeholder="Opcional"></td><td><button type="button" class="btn secondary" data-cp-remove aria-label="Remover CP">×</button></td>';
+   tr.innerHTML='<td><input data-cp="series" aria-label="Número da série da ficha" placeholder="Ex.: 01"></td><td><input data-cp="id" aria-label="Identificação do CP" placeholder="Ex.: 01-A"></td><td><input data-cp="age" type="number" min="0" step="1" aria-label="Idade em dias" placeholder="7 / 28"></td><td><input data-cp="date" aria-label="Data prevista de ruptura" placeholder="dd/mm/aaaa"></td><td><input data-cp="load" inputmode="decimal" aria-label="Carga real em tf" placeholder="Só após ensaio"></td><td><button type="button" class="btn secondary" data-cp-remove aria-label="Remover CP">×</button></td>';
    body.appendChild(tr);
-   for(const k of ['id','age','date','load']){const el=tr.querySelector('[data-cp="'+k+'"]');if(el&&values[k]!=null)el.value=values[k];}
+   for(const k of ['series','id','age','date','load']){const el=tr.querySelector('[data-cp="'+k+'"]');if(el&&values[k]!=null)el.value=values[k];}
    const date=tr.querySelector('[data-cp="date"]');date.dataset.cpDate='1';
    if(!date.value&&tr.querySelector('[data-cp="age"]').value)date.value=cpDateFromAge(tr.querySelector('[data-cp="age"]').value);
  }
@@ -141,22 +141,22 @@ panel = r"""
    if(e.target.matches('[data-cp="date"]'))e.target.dataset.manual='1';
  });
  document.getElementById('ntec-cp-transfer')?.addEventListener('click',()=>{
-   const rows=[...document.querySelectorAll('#ntec-cp-rows tr')].map(tr=>Object.fromEntries(['id','age','date','load'].map(k=>[k,String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()])));
-   const valid=rows.filter(r=>r.id||r.age||r.date||r.load);
+   const rows=[...document.querySelectorAll('#ntec-cp-rows tr')].map(tr=>Object.fromEntries(['series','id','age','date','load'].map(k=>[k,String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()])));
+   const valid=rows.filter(r=>r.series||r.id||r.age||r.date||r.load);
    if(!valid.length){status('Adicione e confira ao menos um CP antes de transferir.');return;}
    if(document.getElementById('reporttype')?.value!=='ruptura_concreto'){status('Selecione o tipo “Ruptura de concreto” para transferir CPs.');return;}
    if(typeof matrixDefinition!=='function'||typeof addReportMatrixRow!=='function'){status('A tabela do relatório não está disponível. Reabra o formulário e tente novamente.');return;}
    const def=matrixDefinition('primary');if(!def?.columns?.length){status('Não foi possível identificar as colunas do relatório.');return;}
    const normHeader=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
    const idx=terms=>def.columns.findIndex(col=>terms.some(t=>normHeader(col).includes(t)));
-   const ix={id:idx(['cp nº','cp n°','cp','amostra']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
+   const ix={id:idx(['cp nº','cp n°','cp','amostra']),series:idx(['série','serie','nº série','numero da serie']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
    if(ix.id<0||ix.age<0||ix.date<0||ix.load<0){status('As colunas de CP, idade, data de ruptura e carga (tf) não foram encontradas na tabela do relatório. Nada foi transferido.');return;}
    const existing=[...document.querySelectorAll('tbody[data-report-matrix-rows="primary"] tr')].map(tr=>({id:String(tr.querySelector('[data-matrix-cell="'+ix.id+'"]')?.value||'').trim().toLowerCase(),age:String(tr.querySelector('[data-matrix-cell="'+ix.age+'"]')?.value||'').trim().toLowerCase()}));
    let added=0,skipped=0;
    valid.forEach(r=>{
      const id=String(r.id||'').trim().toLowerCase(),age=String(r.age||'').trim().toLowerCase();
      if((id||age)&&existing.some(x=>(id&&x.id===id)&&(!age||!x.age||x.age===age))){skipped++;return;}
-     const vals=Array(def.columns.length).fill('');vals[ix.id]=r.id;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age});
+     const vals=Array(def.columns.length).fill('');vals[ix.id]=r.id;if(ix.series>=0)vals[ix.series]=r.series;else if(r.series&&r.id)vals[ix.id]=r.series+' / '+r.id;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age});
    });
    status(added+' CP(s) transferido(s) para a tabela do relatório'+(skipped?'; '+skipped+' possível(is) duplicado(s) ignorado(s)':'')+'. Confira as datas, as idades e as cargas antes de salvar.');
  });
