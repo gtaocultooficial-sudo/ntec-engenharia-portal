@@ -268,7 +268,7 @@ panel = r"""
        if(Array.isArray(value)){value.forEach(inspect);return;}
        if(!value||typeof value!=='object')return;
        if(Array.isArray(value.columns)&&Array.isArray(value.rows)){
-         const names=value.columns.map(c=>norm(c)),si=names.findIndex(n=>n.includes('serie')&&(n.includes('controle')||n.includes('moldagem')));
+         const names=value.columns.map(c=>norm(c)),si=names.findIndex(n=>n.includes('serie'));
          for(const row of value.rows){
            const cells=Array.isArray(row)?row:[];
            if(si>=0){const cell=cells[si],raw=cell&&typeof cell==='object'?(cell.value||''):cell;const n=Number.parseInt(raw,10);if(Number.isInteger(n)&&n>maximum)maximum=n;}
