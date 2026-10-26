@@ -9,6 +9,7 @@ on:
       - 'apply_ntec_report_features.py'
       - 'apply_ntec_pdf_layout.py'
       - 'apply_ntec_rupture_workflow.py'
+      - 'apply_ntec_moldagem_ocr.py'
   workflow_dispatch:
 
 permissions:
@@ -51,6 +52,7 @@ jobs:
           cp recuperar-acesso.html _site/recuperar-acesso.html
           cp atualizar-senha.html _site/atualizar-senha.html
           python3 apply_ntec_report_features.py _site/admin/index.html
+          python3 apply_ntec_moldagem_ocr.py _site/admin/index.html
           python3 apply_ntec_rupture_workflow.py _site/admin/index.html
           python3 apply_ntec_pdf_layout.py _site/admin/index.html
           grep -q "updateReportTitleAuto" _site/admin/index.html
@@ -65,6 +67,8 @@ jobs:
           grep -q "DADOS DO CLIENTE / OBRA" _site/admin/index.html
           grep -q "NTEC ENGENHARIA &amp; GEOTECNIA" _site/admin/index.html
           grep -q "Carga (tf)" _site/admin/index.html
+          grep -q "Importar ficha de moldagem" _site/admin/index.html
+          grep -q "ntec-ocr-apply" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
