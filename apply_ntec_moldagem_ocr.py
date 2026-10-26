@@ -122,6 +122,7 @@ panel = r"""
        {label:'Construtora',left:.085,right:.255,top:.135,bottom:.205},
        {label:'Endereço',left:.285,right:.425,top:.135,bottom:.205},
        {label:'Fornecedor',left:.405,right:.535,top:.175,bottom:.245},
+       {label:'Característica do material',left:.075,right:.31,top:.16,bottom:.225},
        {label:'FCK',left:.045,right:.165,top:.195,bottom:.26},
        {label:'Abatimento teórico',left:.265,right:.405,top:.195,bottom:.26},
        {label:'Local de aplicação',left:.285,right:.525,top:.30,bottom:.66}
@@ -194,8 +195,19 @@ panel = r"""
  });
  function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
  function valueAfter(text,labels){
-   const lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-   for(const label of labels){const wanted=norm(label);for(let i=0;i<lines.length;i++){const line=lines[i],n=norm(line),pos=n.indexOf(wanted);if(pos>=0){const raw=line.split(/[:|]/);if(raw.length>1&&raw.slice(1).join(':').trim().length>1)return raw.slice(1).join(':').trim();if(lines[i+1]&&!/^[\d\W]+$/.test(lines[i+1]))return lines[i+1];}}}
+   const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+   // Prefer the separately OCR'd fixed-field crops, which are less likely to mix adjacent columns.
+   const cropStart=lines.findIndex(x=>norm(x).includes('campos detectados por recorte'));
+   if(cropStart>=0){
+     const cropEnd=lines.findIndex((x,i)=>i>cropStart&&norm(x).startsWith('pagina'));
+     const cropLines=lines.slice(cropStart+1,cropEnd<0?undefined:cropEnd);
+     for(const label of labels){
+       const wanted=norm(label);
+       const hit=cropLines.find(line=>{const parts=line.split(':');return parts.length>1&&norm(parts[0])===wanted;});
+       if(hit){const value=hit.slice(hit.indexOf(':')+1).trim();if(value&&!/^\[nao reconhecido\]$/i.test(norm(value)))return value;}
+     }
+   }
+   for(const label of labels){const wanted=norm(label);for(let i=0;i<lines.length;i++){const line=lines[i],n=norm(line);if(!n.includes(wanted))continue;const raw=line.split(/[:|]/);if(raw.length>1){const value=raw.slice(1).join(':').trim();if(value.length>1&&norm(value)!==wanted)return value;}const next=lines.slice(i+1,i+3).find(x=>x.length>1&&!/^[\d\W]+$/.test(x)&&!norm(x).includes('pagina'));if(next)return next;}}
    return '';
  }
  function fillField(el,val){if(!el||!val||el.readOnly||el.disabled)return false;el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;}
@@ -208,12 +220,15 @@ panel = r"""
    const dims=valueAfter(t,['dimensoes dos corpos de prova','dimensoes cp','dimensoes','diametro']);
    if(dims){const el=document.querySelector('[data-report-field="specimen_dimensions"]');if(fillField(el,dims))filled++;}
    const fields=[...document.querySelectorAll('#reporttemplatefields [data-report-field]')];
-   for(const el of fields){const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||el.dataset.reportField;const key=norm(label+' '+el.dataset.reportField);let labels=[];if(/fornecedor|supplier/.test(key))labels=['fornecedor'];else if(/nota fiscal|invoice/.test(key))labels=['nota fiscal','nf'];else if(/caminhao|betonada/.test(key))labels=['caminhao','betonada'];else if(/lote|batch/.test(key))labels=['lote','batch'];else if(/abatimento|slump/.test(key))labels=['abatimento','slump'];else if(/identificacao|codigo.*obra|work number/.test(key))labels=['identificacao da obra','codigo da obra'];if(labels.length){const v=valueAfter(t,labels);if(v&&fillField(el,v))filled++;}}
-   const typeText=norm(t),typeEl=document.getElementById('reporttype');
-   if(typeEl&&/graute/.test(typeText)&&[...typeEl.options].some(o=>o.value==='graute_alvenaria')){typeEl.value='graute_alvenaria';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
-   else if(typeEl&&/argamassa/.test(typeText)&&[...typeEl.options].some(o=>o.value==='compressao_argamassa')){typeEl.value='compressao_argamassa';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
-   else if(typeEl&&/concreto/.test(typeText)&&[...typeEl.options].some(o=>o.value==='ruptura_concreto')){typeEl.value='ruptura_concreto';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
-   status('Sugestões aplicadas: '+filled+' campo(s). Confira todos os campos e as tabelas de CPs manualmente antes de salvar; nenhum resultado de ruptura foi inventado.');
+   for(const el of fields){const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||el.dataset.reportField;const key=norm(label+' '+el.dataset.reportField);let labels=[];if(/fornecedor|supplier/.test(key))labels=['fornecedor'];else if(/nota fiscal|invoice/.test(key))labels=['nota fiscal','nf'];else if(/caminhao|betonada|bt numero/.test(key))labels=['caminhao','bt'];else if(/lote|batch/.test(key))labels=['lote','batch'];else if(/fck|resistencia caracteristica/.test(key))labels=['fck'];else if(/abatimento teorico|slump teorico/.test(key))labels=['abatimento teorico'];else if(/abatimento|slump/.test(key))labels=['abatimento','slump'];else if(/local de aplicacao|elemento estrutural|aplicacao/.test(key))labels=['local de aplicacao'];else if(/volume/.test(key))labels=['volume'];else if(/identificacao|codigo.*obra|work number/.test(key))labels=['identificacao da obra','codigo da obra'];if(labels.length){const v=valueAfter(t,labels);if(v&&fillField(el,v))filled++;}}
+   const material=norm(valueAfter(t,['caracteristica do material'])),typeEl=document.getElementById('reporttype');
+   // The blank template prints all three material choices. Change the report type only if the crop OCR sees an explicit check mark.
+   const checkedConcrete=/concreto.{0,12}(?:\\bx\\b|✓|✔|☒|☑)/i.test(material);
+   const checkedMortar=/argamassa.{0,12}(?:\\bx\\b|✓|✔|☒|☑)/i.test(material);
+   const checkedGrout=/graute.{0,12}(?:\\bx\\b|✓|✔|☒|☑)/i.test(material);
+   const selectedType=checkedConcrete&&!checkedMortar&&!checkedGrout?'ruptura_concreto':checkedMortar&&!checkedConcrete&&!checkedGrout?'compressao_argamassa':checkedGrout&&!checkedConcrete&&!checkedMortar?'graute_alvenaria':'';
+   if(typeEl&&selectedType&&[...typeEl.options].some(o=>o.value===selectedType)){typeEl.value=selectedType;typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
+   status('Sugestões aplicadas: '+filled+' campo(s). A leitura agora prioriza recortes separados dos campos; confira os valores e a tabela antes de salvar. O tipo do material só é alterado quando a marcação do formulário é inequívoca.');
  });
 })();
 </script>
