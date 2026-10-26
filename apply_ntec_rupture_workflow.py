@@ -241,13 +241,11 @@ rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
    const age=ntecRuptureParseNumber(row[ai]),load=ntecRuptureParseNumber(row[li]);
    if(!Number.isFinite(age)||age<0||load>0)return;
    const rawDate=di>=0?String(row[di]||'').trim():'';
-   let date=null;
-   let m=rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+   let date=null,m=rawDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
    if(m)date=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));
    if(!date&&/^\d{4}-\d{2}-\d{2}$/.test(castingDate)){date=new Date(castingDate+'T12:00:00');date.setDate(date.getDate()+Math.round(age));}
    if(!date||Number.isNaN(date.getTime()))return;
-   date.setHours(0,0,0,0);
-   const days=Math.round((date-today)/86400000);
+   date.setHours(0,0,0,0);const days=Math.round((date-today)/86400000);
    if(days<=3)due.push({report,cp:row[ntecRuptureHeaderIndex(cols,'cp')]||String(i+1),date,days});
   });
  }
@@ -263,9 +261,14 @@ rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
  panel.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
 }
 function renderReports(){
-  const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" onclick="openRuptureEntry(\\''+esc(r.id)+'\\')">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
-  return '<tr><td><strong>'+esc(r.report_number||'Número pendente')+'</strong><div>'+esc(r.title)+'</div><div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+'<button class="btn" onclick="editReport(\\''+esc(r.id)+'\\')">Editar</button> <button class="btn" onclick="printNtecReport(\\''+esc(r.id)+'\\')">PDF</button></td></tr>';
+ const body=document.getElementById('reportsbody');
+ body.innerHTML=reports.length?reports.map(r=>{
+  const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" data-rp-report="'+esc(r.id)+'">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
+  return '<tr><td><strong>'+esc(r.report_number||'Número pendente')+'</strong><div>'+esc(r.title)+'</div><div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+'<button class="btn" data-rp-edit="'+esc(r.id)+'">Editar</button> <button class="btn" data-rp-pdf="'+esc(r.id)+'">PDF</button></td></tr>';
  }).join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>';
+ body.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
+ body.querySelectorAll('[data-rp-edit]').forEach(button=>button.addEventListener('click',()=>editReport(button.dataset.rpEdit)));
+ body.querySelectorAll('[data-rp-pdf]').forEach(button=>button.addEventListener('click',()=>printNtecReport(button.dataset.rpPdf)));
  ntecRenderRuptureAlerts();
 }
 function matrixHtml""",'botão de lançamento de ruptura')
