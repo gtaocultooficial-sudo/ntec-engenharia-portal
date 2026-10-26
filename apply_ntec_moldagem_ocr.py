@@ -271,7 +271,9 @@ panel = r"""
          const names=value.columns.map(c=>norm(c)),si=names.findIndex(n=>n.includes('serie'));
          for(const row of value.rows){
            const cells=Array.isArray(row)?row:[];
-           if(si>=0){const cell=cells[si],raw=cell&&typeof cell==='object'?(cell.value||''):cell;const n=Number.parseInt(raw,10);if(Number.isInteger(n)&&n>maximum)maximum=n;}
+           const namedSeries=cells.find(cell=>cell&&typeof cell==='object'&&/serie/.test(norm(cell.label||'')));
+           if(namedSeries){const n=Number.parseInt(namedSeries.value,10);if(Number.isInteger(n)&&n>maximum)maximum=n;}
+           else if(si>=0){const cell=cells[si],raw=cell&&typeof cell==='object'?(cell.value||''):cell;const n=Number.parseInt(raw,10);if(Number.isInteger(n)&&n>maximum)maximum=n;}
            const text=cells.map(c=>String(c&&typeof c==='object'?(c.value||''):c||'')).join(' ');
            for(const m of text.matchAll(/s[ée]rie\s*0*(\d+)\s*(?:\/|-)\s*cp/gi))maximum=Math.max(maximum,Number(m[1])||0);
          }
