@@ -224,12 +224,13 @@ panel = r"""
    const ix={id:idx(['identificação do cp','identificacao do cp','cp nº','cp n°','cp','amostra']),series:idx(['nº série','numero da serie','série da moldagem','serie da moldagem']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
    if(ix.id<0||ix.age<0){status('Não foi possível localizar as colunas de identificação do CP e idade na tabela do relatório. Nada foi transferido; confira o modelo de relatório.');return;}if(ix.date<0)ix.date=idx(['data prevista','previsão de ruptura','previsao de ruptura']);if(ix.date<0){status('Não foi localizada uma coluna de data de ruptura/previsão no relatório. Nada foi transferido.');return;}
    if(ix.series===ix.id)ix.series=-1;
-   const existing=[...document.querySelectorAll('tbody[data-report-matrix-rows="primary"] tr')].map(tr=>({id:String(tr.querySelector('[data-matrix-cell="'+ix.id+'"]')?.value||'').trim().toLowerCase(),age:String(tr.querySelector('[data-matrix-cell="'+ix.age+'"]')?.value||'').trim().toLowerCase()}));
+   const existing=[...document.querySelectorAll('tbody[data-report-matrix-rows="primary"] tr')].map(tr=>({id:String(tr.querySelector('[data-matrix-cell="'+ix.id+'"]')?.value||'').trim().toLowerCase(),age:String(tr.querySelector('[data-matrix-cell="'+ix.age+'"]')?.value||'').trim().toLowerCase(),series:ix.series>=0?String(tr.querySelector('[data-matrix-cell="'+ix.series+'"]')?.value||'').trim().toLowerCase():''}));
    let added=0,skipped=0;
    valid.forEach(r=>{
-     const id=String(r.id||'').trim().toLowerCase(),age=String(r.age||'').trim().toLowerCase();
-     if((id||age)&&existing.some(x=>(id&&x.id===id)&&(!age||!x.age||x.age===age))){skipped++;return;}
-     const vals=Array(def.columns.length).fill('');vals[ix.id]=(ix.series<0&&r.series&&r.id)?'Série '+r.series+' / '+r.id:(r.id||'');if(ix.series>=0)vals[ix.series]=r.series;vals[ix.age]=r.age;vals[ix.date]=r.date;if(ix.load>=0)vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age});
+     const series=String(r.series||'').trim().toLowerCase(),age=String(r.age||'').trim().toLowerCase();
+     const id=String((ix.series<0&&r.series&&r.id)?'Série '+r.series+' / '+r.id:(r.id||'')).trim().toLowerCase();
+     if(id&&existing.some(x=>x.id===id&&(ix.series<0||x.series===series)&&(!age||!x.age||x.age===age))){skipped++;return;}
+     const vals=Array(def.columns.length).fill('');vals[ix.id]=(ix.series<0&&r.series&&r.id)?'Série '+r.series+' / '+r.id:(r.id||'');if(ix.series>=0)vals[ix.series]=r.series;vals[ix.age]=r.age;vals[ix.date]=r.date;if(ix.load>=0)vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age,series});
    });
    status(added+' CP(s) transferido(s) para a tabela do relatório'+(skipped?'; '+skipped+' possível(is) duplicado(s) ignorado(s)':'')+'. Confira as datas, as idades e as cargas antes de salvar.');
  });
