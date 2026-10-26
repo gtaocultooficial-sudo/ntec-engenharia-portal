@@ -88,7 +88,7 @@ panel = r"""
    return variants;
  }
  function ocrScore(text,confidence){
-   const raw=String(text||''),t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+   const raw=String(text||''),t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
    // Pontua rótulos próprios do FORM02 para escolher orientação legível.
    const anchors=['formulario de moldagem','codigo da obra','n serie campo','n serie controle','construtora','caracteristica do material','abatimento teorico','local de aplicacao','idades de ruptura','horario do moldador','total de cps coletados','recepcao no laboratorio','fornecedor','quantidade cps','moldagem','form02'];
    let score=anchors.reduce((n,w)=>n+(t.includes(w)?12:0),0);
@@ -126,15 +126,15 @@ panel = r"""
      const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
      try{for(let i=0;i<pages.length;i++){status('Preparando página '+(i+1)+' de '+pages.length+'…');const variants=makeOcrVariants(pages[i]);let best={score:-1,text:'',angle:0,mode:'6'};for(const variant of variants){for(const mode of ['6','11','12']){status('Lendo página '+(i+1)+' — rotação '+variant.angle+'°, modo '+mode+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const result=await worker.recognize(variant.canvas);const score=ocrScore(result.data.text,result.data.confidence);if(score>best.score)best={score,text:result.data.text,angle:variant.angle,mode,canvas:variant.canvas};}}const fieldCrops=[
-       {label:'Código da obra',left:.495,right:.585,top:.045,bottom:.135},
-       {label:'Data da moldagem',left:.585,right:.715,top:.045,bottom:.135},
+       {label:'Código da obra',left:.485,right:.615,top:.045,bottom:.135},
+       {label:'Data da moldagem',left:.575,right:.765,top:.045,bottom:.135},
        {label:'Construtora',left:.085,right:.255,top:.135,bottom:.205},
        {label:'Endereço',left:.285,right:.425,top:.135,bottom:.205},
        {label:'Fornecedor',left:.405,right:.535,top:.175,bottom:.245},
        {label:'Característica do material',left:.075,right:.31,top:.16,bottom:.225},
        {label:'FCK',left:.045,right:.165,top:.195,bottom:.26},
        {label:'Abatimento teórico',left:.265,right:.405,top:.195,bottom:.26},
-       {label:'Local de aplicação',left:.285,right:.525,top:.30,bottom:.66}
+       {label:'Local de aplicação',left:.255,right:.525,top:.34,bottom:.52}
      ];
      const cropSuggestions=[];
      for(const f of fieldCrops){
@@ -244,7 +244,7 @@ panel = r"""
      const cropLines=lines.slice(cropStart+1,cropEnd<0?undefined:cropEnd);
      for(const label of labels){
        const wanted=norm(label);
-       const hit=cropLines.find(line=>{const parts=line.split(':');return parts.length>1&&norm(parts[0])===wanted;});
+       const hit=cropLines.find(line=>{const parts=line.split(':');return parts.length>1&&(norm(parts[0])===wanted||norm(parts[0]).startsWith(wanted+' '));});
        if(hit){const value=hit.slice(hit.indexOf(':')+1).trim();if(value&&!/^\[nao reconhecido\]$/i.test(norm(value)))return value;}
      }
    }
