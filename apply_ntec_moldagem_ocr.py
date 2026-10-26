@@ -269,14 +269,33 @@ panel = r"""
  applyBtn.addEventListener('click',()=>{
    const t=textEl.value;if(!t.trim()){status('Faça a leitura ou cole o texto da ficha primeiro.');return;}
    let filled=0;
-   const dateRaw=valueAfter(t,['data da moldagem','data de moldagem','data da coleta']);
+   const dateRaw=ocrCandidate('casting_date')||valueAfter(t,['data da moldagem','data de moldagem','data da coleta']);
    const dateMatch=dateRaw.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
    if(dateMatch){let y=dateMatch[3];if(y.length===2)y='20'+y;const iso=y+'-'+dateMatch[2].padStart(2,'0')+'-'+dateMatch[1].padStart(2,'0');const el=document.querySelector('[data-report-field="casting_date"]');if(fillField(el,iso))filled++;}
    const dims=valueAfter(t,['dimensoes dos corpos de prova','dimensoes cp','dimensoes','diametro']);
    if(dims){const el=document.querySelector('[data-report-field="specimen_dimensions"]');if(fillField(el,dims))filled++;}
    const fields=[...document.querySelectorAll('#reporttemplatefields [data-report-field]')];
-   for(const el of fields){const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||el.dataset.reportField;const key=norm(label+' '+el.dataset.reportField);let labels=[];if(/fornecedor|supplier/.test(key))labels=['fornecedor'];else if(/nota fiscal|invoice/.test(key))labels=['nota fiscal','nf'];else if(/caminhao|betonada|bt numero/.test(key))labels=['caminhao','bt'];else if(/lote|batch/.test(key))labels=['lote','batch'];else if(/fck|resistencia caracteristica/.test(key))labels=['fck'];else if(/abatimento teorico|slump teorico/.test(key))labels=['abatimento teorico'];else if(/abatimento|slump/.test(key))labels=['abatimento','slump'];else if(/local de aplicacao|elemento estrutural|aplicacao/.test(key))labels=['local de aplicacao'];else if(/volume/.test(key))labels=['volume'];else if(/identificacao|codigo.*obra|work number/.test(key))labels=['identificacao da obra','codigo da obra'];if(labels.length){const v=valueAfter(t,labels);if(v&&fillField(el,v))filled++;}}
-   const material=norm(valueAfter(t,['caracteristica do material'])),typeEl=document.getElementById('reporttype');
+   for(const el of fields){
+     const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||el.dataset.reportField,key=norm(label+' '+el.dataset.reportField);
+     let labels=[],directKey='';
+     if(/fornecedor|supplier/.test(key)){labels=['fornecedor'];directKey='supplier';}
+     else if(/nota fiscal|invoice/.test(key))labels=['nota fiscal','nf'];
+     else if(/caminhao|betonada|bt numero/.test(key))labels=['caminhao','bt'];
+     else if(/lote|batch/.test(key))labels=['lote','batch'];
+     else if(/fck|resistencia caracteristica/.test(key)){labels=['fck'];directKey='fck';}
+     else if(/abatimento teorico|slump teorico/.test(key)){labels=['abatimento teorico'];directKey='slump';}
+     else if(/abatimento|slump/.test(key)){labels=['abatimento','slump'];directKey='slump';}
+     else if(/local de aplicacao|elemento estrutural|aplicacao/.test(key)){labels=['local de aplicacao'];directKey='application';}
+     else if(/volume/.test(key))labels=['volume'];
+     else if(/identificacao|codigo.*obra|work number/.test(key))labels=['identificacao da obra','codigo da obra'];
+     if(labels.length){
+       let v=(directKey?ocrCandidate(directKey):'')||valueAfter(t,labels);
+       if(directKey==='supplier')v=v.replace(/^fornecedor\s*/i,'').trim();
+       if(directKey==='fck'){const m=v.match(/\b\d{1,3}(?:[.,]\d+)?\b/);if(m)v=m[0];}
+       if(v&&fillField(el,v))filled++;
+     }
+   }
+   const material=norm(ocrCandidate('material')||valueAfter(t,['caracteristica do material'])),typeEl=document.getElementById('reporttype');
    // The blank template prints all three material choices. Change the report type only if the crop OCR sees an explicit check mark.
    const checkedConcrete=/concreto.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
    const checkedMortar=/argamassa.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
