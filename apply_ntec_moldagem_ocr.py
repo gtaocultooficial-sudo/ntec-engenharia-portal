@@ -32,7 +32,7 @@ panel = r"""
   <h4>Gerar CPs por série</h4>
   <p>Uma linha preenchida da ficha corresponde a uma série. A série de campo é ignorada; o sistema continua a numeração de controle da obra. Ajuste os valores abaixo conforme a ficha antes de gerar.</p>
   <div class="ntec-series-generator">
-    <label>Linhas de série preenchidas <input id="ntec-cp-series-count" type="number" min="1" max="10" step="1" value="10"></label>
+    <label>Linhas de série preenchidas <input id="ntec-cp-series-count" type="number" min="1" max="10" step="1" value="1"></label>
     <label>Idades (dias, separadas por vírgula) <input id="ntec-cp-ages" value="7,28" placeholder="Ex.: 3, 7, 28"></label>
     <label>CPs por idade (na mesma ordem) <input id="ntec-cp-age-counts" value="2,2" placeholder="Ex.: 2, 2, 2"></label>
   </div>
@@ -134,7 +134,7 @@ panel = r"""
        {key:'casting_date',label:'Data da moldagem',left:.655,right:.79,top:.06,bottom:.145},
        {key:'contractor',label:'Construtora',left:.085,right:.285,top:.155,bottom:.205},
        {key:'address',label:'Endereço',left:.285,right:.425,top:.155,bottom:.205},
-       {key:'supplier',label:'Fornecedor',left:.365,right:.49,top:.19,bottom:.255},
+       {key:'supplier',label:'Fornecedor',left:.365,right:.55,top:.19,bottom:.255},
        {key:'material',label:'Característica do material',left:.075,right:.37,top:.18,bottom:.25},
        {key:'fck',label:'FCK',left:.065,right:.16,top:.205,bottom:.275},
        {key:'slump',label:'Abatimento teórico',left:.29,right:.42,top:.195,bottom:.255},
@@ -270,7 +270,7 @@ panel = r"""
    const t=textEl.value;if(!t.trim()){status('Faça a leitura ou cole o texto da ficha primeiro.');return;}
    let filled=0;
    const dateRaw=ocrCandidate('casting_date')||valueAfter(t,['data da moldagem','data de moldagem','data da coleta']);
-   const dateMatch=dateRaw.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);
+   const dateMatch=dateRaw.match(/(\d{1,2})[\s\/.,'-](\d{1,2})[\s\/.,'-](\d{2,4})/);
    if(dateMatch){let y=dateMatch[3];if(y.length===2)y='20'+y;const iso=y+'-'+dateMatch[2].padStart(2,'0')+'-'+dateMatch[1].padStart(2,'0');const el=document.querySelector('[data-report-field="casting_date"]');if(fillField(el,iso))filled++;}
    const dims=valueAfter(t,['dimensoes dos corpos de prova','dimensoes cp','dimensoes','diametro']);
    if(dims){const el=document.querySelector('[data-report-field="specimen_dimensions"]');if(fillField(el,dims))filled++;}
@@ -295,11 +295,11 @@ panel = r"""
        if(v&&fillField(el,v))filled++;
      }
    }
-   const material=norm(ocrCandidate('material')||valueAfter(t,['caracteristica do material'])),typeEl=document.getElementById('reporttype');
+   const material=String(ocrCandidate('material')||valueAfter(t,['caracteristica do material'])).toLowerCase(),typeEl=document.getElementById('reporttype');
    // The blank template prints all three material choices. Change the report type only if the crop OCR sees an explicit check mark.
-   const checkedConcrete=/concreto.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
-   const checkedMortar=/argamassa.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
-   const checkedGrout=/graute.{0,12}(?:\bx\b|✓|✔|☒|☑)/i.test(material);
+   const checkedConcrete=/concreto\s*(?:\(\s*[xX]\s*\)|\[\s*[xX]\s*\]|[✓✔☒☑])/i.test(material);
+   const checkedMortar=/argamassa\s*(?:\(\s*[xX]\s*\)|\[\s*[xX]\s*\]|[✓✔☒☑])/i.test(material);
+   const checkedGrout=/graute\s*(?:\(\s*[xX]\s*\)|\[\s*[xX]\s*\]|[✓✔☒☑])/i.test(material);
    const selectedType=checkedConcrete&&!checkedMortar&&!checkedGrout?'ruptura_concreto':checkedMortar&&!checkedConcrete&&!checkedGrout?'compressao_argamassa':checkedGrout&&!checkedConcrete&&!checkedMortar?'graute_alvenaria':'';
    if(typeEl&&selectedType&&[...typeEl.options].some(o=>o.value===selectedType)){typeEl.value=selectedType;typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
    status('Sugestões aplicadas: '+filled+' campo(s). A leitura agora prioriza recortes separados dos campos; confira os valores e a tabela antes de salvar. O tipo do material só é alterado quando a marcação do formulário é inequívoca.');
