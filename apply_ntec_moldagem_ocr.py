@@ -42,7 +42,7 @@ panel = r"""
   <h4>Dados individuais das 10 séries</h4>
   <p>Horários, carga/identificação, abatimento, BT, nota fiscal e volume ficam separados por série. Os campos que não puderem ser confirmados pela ficha ficam para conferência, mas não impedem a geração das 10 séries.</p>
   <div class="ntec-cp-table-wrap"><table class="ntec-cp-table ntec-series-detail-table"><thead><tr><th>Série de controle</th><th>Carga (horário)</th><th>Horário de moldagem</th><th>CPs</th><th>Abatimento (mm)</th><th>Nº série BT</th><th>Nota fiscal</th><th>Volume (m³)</th></tr></thead><tbody id="ntec-series-meta-rows"></tbody></table></div>
-  <small>O gerador cria as identificações, as idades e as datas previstas. A carga real da prensa dos CPs fica vazia até o ensaio. BT, nota fiscal e volume são dados da ficha e podem variar entre séries.</small>
+  <small>O gerador cria as 10 séries e os 40 CPs. A carga real da prensa fica vazia até o ensaio. BT, nota fiscal, volumes e abatimentos pré-carregados são sugestões lidas visualmente do manuscrito: revise cada linha antes de salvar.</small>
   <small>Não preenchemos automaticamente números manuscritos incertos. Os resultados reais de ruptura devem ser lançados somente após o ensaio.</small>
   <small>O arquivo é processado no navegador e não é enviado a um serviço externo de OCR. É necessária conexão para carregar as bibliotecas de leitura.</small>
 </div>
