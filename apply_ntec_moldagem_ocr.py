@@ -264,18 +264,21 @@ panel = r"""
      const sd=report.structured_data||{};
      const serialized=JSON.stringify(sd);
      for(const m of serialized.matchAll(/s[ée]rie\s*0*(\d+)\s*(?:\/|-)\s*cp/gi))maximum=Math.max(maximum,Number(m[1])||0);
-     const walk=(value,key='')=>{
-       if(Array.isArray(value)){value.forEach(v=>walk(v,key));return;}
-       if(value&&typeof value==='object'){
-         if(/series|s[eé]rie|controlseries/i.test(key)){
-           const n=Number.parseInt(value,10);if(Number.isInteger(n)&&n>maximum)maximum=n;
+     const inspect=(value)=>{
+       if(Array.isArray(value)){value.forEach(inspect);return;}
+       if(!value||typeof value!=='object')return;
+       if(Array.isArray(value.columns)&&Array.isArray(value.rows)){
+         const names=value.columns.map(c=>norm(c)),si=names.findIndex(n=>n.includes('serie')&&(n.includes('controle')||n.includes('moldagem')));
+         for(const row of value.rows){
+           const cells=Array.isArray(row)?row:[];
+           if(si>=0){const cell=cells[si],raw=cell&&typeof cell==='object'?(cell.value||''):cell;const n=Number.parseInt(raw,10);if(Number.isInteger(n)&&n>maximum)maximum=n;}
+           const text=cells.map(c=>String(c&&typeof c==='object'?(c.value||''):c||'')).join(' ');
+           for(const m of text.matchAll(/s[ée]rie\\s*0*(\\d+)\\s*(?:\\/|-)\\s*cp/gi))maximum=Math.max(maximum,Number(m[1])||0);
          }
-         Object.entries(value).forEach(([k,v])=>walk(v,k));
-       }else if(typeof value==='string'&&/series|s[eé]rie|controlseries/i.test(key)){
-         const n=Number.parseInt(value,10);if(Number.isInteger(n)&&n>maximum)maximum=n;
        }
+       Object.values(value).forEach(inspect);
      };
-     walk(sd);
+     inspect(sd);
    }
    return maximum+1;
  }
@@ -325,6 +328,47 @@ panel = r"""
    target.value=(keep?keep+'\\n\\n':'')+marker+'\\n'+lines.join('\\n');
    target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));
  }
+ document.getElementById('ntec-cp-use-form02')?.addEventListener('click',()=>{
+   const typeEl=document.getElementById('reporttype');
+   if(typeEl&&[...typeEl.options].some(o=>o.value==='ruptura_concreto')){typeEl.value='ruptura_concreto';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
+   const projectSelect=document.getElementById('reportproject');
+   if(projectSelect&&typeof projectsData!=='undefined'){
+     const candidates=projectsData.filter(p=>String(p.work_number||'').replace(/\\D/g,'')==='1408');
+     if(candidates.length===1){projectSelect.value=String(candidates[0].id);projectSelect.dispatchEvent(new Event('change',{bubbles:true}));}
+   }
+   const casting=document.querySelector('[data-report-field="casting_date"]');
+   if(casting){casting.value='2026-10-16';casting.dispatchEvent(new Event('input',{bubbles:true}));casting.dispatchEvent(new Event('change',{bubbles:true}));}
+   const dimensions=document.querySelector('[data-report-field="specimen_dimensions"]');
+   if(dimensions){dimensions.value='100 x 200';dimensions.dispatchEvent(new Event('input',{bubbles:true}));dimensions.dispatchEvent(new Event('change',{bubbles:true}));}
+   const fields=[...document.querySelectorAll('#reporttemplatefields [data-report-field]')];
+   for(const el of fields){
+     const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||'',key=norm(label+' '+el.dataset.reportField);
+     let value=null,numeric=null;
+     if(/fck|resistencia caracteristica/.test(key)){value='40';numeric=40;}
+     else if(/fornecedor|supplier/.test(key))value='Supermix';
+     else if(/abatimento teorico|slump teorico/.test(key)){value='120 ± 20 mm';numeric=120;}
+     else if(/local de aplicacao|elemento estrutural|aplicacao/.test(key))value='Vigas de travamento';
+     else if(/agregado|brita|granulometria/.test(key))value='Brita 0 e Brita 1';
+     else if(/volume/.test(key))continue;
+     if(value!==null){
+       el.value=el.type==='number'&&numeric!==null?String(numeric):value;
+       el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));
+     }
+   }
+   const codeTargets=fields.filter(el=>/codigo da obra|work code|identificacao da obra/.test(norm((el.closest('.field')?.querySelector('label')?.textContent||'')+' '+el.dataset.reportField)));
+   codeTargets.forEach(el=>{el.value='1408';el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));});
+   const setIfEmpty=(id,value)=>{const el=document.getElementById(id);if(el&&!String(el.value||'').trim()){el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}};
+   setIfEmpty('reportcontent','Moldagem de concreto para vigas de travamento. FCK especificado: 40 MPa. Agregados: brita 0 e brita 1. Corpos de prova cilíndricos de 100 x 200 mm.');
+   setIfEmpty('reportmethod','Dados transcritos da ficha de moldagem EMPREITEC. Foram previstos 2 CPs para 7 dias e 2 CPs para 28 dias em cada série. Registrar a data real do ensaio e a carga da prensa quando cada CP for rompido.');
+   document.getElementById('ntec-cp-series-count').value='10';
+   document.getElementById('ntec-cp-ages').value='7,28';
+   document.getElementById('ntec-cp-age-counts').value='2,2';
+   const start=ntecDefaultControlSeries();document.getElementById('ntec-cp-start-series').value=String(start);
+   ntecRenderSeriesMetaRows(start,10);
+   if(typeof updateReportTitleAuto==='function')updateReportTitleAuto();
+   status('Padrão confirmado aplicado: obra 1408, moldagem 16/10/2026, FCK 40 MPa, Supermix, vigas de travamento, brita 0 + brita 1 e 10 séries. Serão gerados 40 CPs; confira os dados de BT, nota fiscal e volume por série.');
+   document.getElementById('ntec-cp-generate')?.click();
+ });
  document.getElementById('ntec-series-meta-rows')?.addEventListener('input',()=>ntecSyncSeriesMetadataToReport());
  document.getElementById('ntec-cp-generate')?.addEventListener('click',()=>{
    const count=Number.parseInt(document.getElementById('ntec-cp-series-count')?.value||'',10);
