@@ -55,7 +55,7 @@ panel = r"""
 .ntec-ocr-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .ntec-ocr-card input[type=file]{max-width:100%;padding:8px}
 .ntec-ocr-card textarea{width:100%;box-sizing:border-box;margin:6px 0 10px}
-#ntec-ocr-status{font-size:12px;font-weight:700;margin:8px 0;color:#29465f}.ntec-ocr-fields-preview{display:grid;grid-template-columns:repeat(2,minmax(160px,1fr));gap:8px;margin:8px 0 12px}.ntec-ocr-fields-preview label{display:block;font-size:12px;font-weight:700;color:#29465f}.ntec-ocr-fields-preview input{display:block;box-sizing:border-box;width:100%;margin-top:4px;padding:8px;border:1px solid #cbd6e1;border-radius:5px;font-weight:400}.ntec-ocr-raw{margin:8px 0;border:1px solid #d5dee7;border-radius:7px;padding:8px}.ntec-ocr-raw summary{cursor:pointer;font-size:12px;font-weight:700;color:#526579}@media(max-width:650px){.ntec-ocr-fields-preview{grid-template-columns:1fr}}
+#ntec-ocr-status{font-size:12px;font-weight:700;margin:8px 0;color:#29465f}.ntec-ocr-fields-preview{display:grid;grid-template-columns:repeat(2,minmax(160px,1fr));gap:8px;margin:8px 0 12px}.ntec-ocr-field-card{border:1px solid #d5dee7;border-radius:7px;padding:8px;background:#fff;min-width:0}.ntec-ocr-field-card img{display:block;width:100%;max-height:90px;object-fit:contain;background:#f8fafc;border-radius:4px;margin:0 0 7px}.ntec-ocr-fields-preview label{display:block;font-size:12px;font-weight:700;color:#29465f}.ntec-ocr-fields-preview input{display:block;box-sizing:border-box;width:100%;margin-top:4px;padding:8px;border:1px solid #cbd6e1;border-radius:5px;font-weight:400}.ntec-ocr-raw{margin:8px 0;border:1px solid #d5dee7;border-radius:7px;padding:8px}.ntec-ocr-raw summary{cursor:pointer;font-size:12px;font-weight:700;color:#526579}@media(max-width:650px){.ntec-ocr-fields-preview{grid-template-columns:1fr}}
 </style>
 <script>
 (function(){
@@ -216,9 +216,11 @@ panel = r"""
      if(preview){
        preview.innerHTML='';
        for(const field of cropSuggestions){
+         const card=document.createElement('div');card.className='ntec-ocr-field-card';
          const label=document.createElement('label'),caption=document.createElement('span'),input=document.createElement('input');
          caption.textContent=field.label;input.type='text';input.value=field.text;input.placeholder='Não reconhecido — confira manualmente';input.dataset.ocrField=field.key;
-         label.appendChild(caption);label.appendChild(input);preview.appendChild(label);
+         if(field.image){const img=document.createElement('img');img.src=field.image;img.alt='Recorte da ficha: '+field.label;img.loading='lazy';card.appendChild(img);}
+         label.appendChild(caption);label.appendChild(input);card.appendChild(label);preview.appendChild(card);
        }
      }
      output.push('--- CAMPOS DETECTADOS POR RECORTE (confira) ---\n'+cropSuggestions.map(f=>f.label+': '+f.text).join('\n')+'\n\n--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\n'+best.text+'\n\n'+regionText.join('\n\n'));}}
