@@ -329,7 +329,7 @@ panel = r"""
    const value=x=>x||'—';
    const header='PADRÃO CONFIRMADO: obra 1408 | moldagem 16/10/2026 | FCK 40 MPa | fornecedor Supermix | vigas de travamento | brita 0 e brita 1 | abatimento teórico 120 ± 20 mm | CPs cilíndricos 100 x 200 mm | 2 CPs aos 7 dias e 2 CPs aos 28 dias por série.';
    const lines=rows.map(r=>'Série de controle '+value(r.series)+' | carga/horário '+value(r.loadTime)+' | moldagem '+value(r.moldingTime)+' | CPs '+value(r.cpCount)+' | abatimento '+value(r.slump)+' mm | BT '+value(r.bt)+' | nota fiscal '+value(r.invoice)+' | volume '+value(r.volume)+' m³');
-   target.value=(keep?keep+'\\n\\n':'')+header+'\\n'+marker+'\\n'+lines.join('\\n');
+   target.value=(keep?keep+'\n\n':'')+header+'\n'+marker+'\n'+lines.join('\n');
    target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));
  }
  document.getElementById('ntec-cp-use-form02')?.addEventListener('click',()=>{
