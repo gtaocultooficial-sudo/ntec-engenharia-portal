@@ -42,7 +42,7 @@ panel = r"""
   <button type="button" class="btn secondary" id="ntec-cp-generate">Gerar CPs e séries sequenciais</button>
   <h4>Dados individuais das 10 séries</h4>
   <p>Horários, carga/identificação, abatimento, BT, nota fiscal e volume ficam separados por série. Os campos que não puderem ser confirmados pela ficha ficam para conferência, mas não impedem a geração das 10 séries.</p>
-  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table ntec-series-detail-table"><thead><tr><th>Série de controle</th><th>Carga (horário)</th><th>Horário de moldagem</th><th>CPs</th><th>Abatimento (mm)</th><th>Nº série BT</th><th>Nota fiscal</th><th>Volume (m³)</th></tr></thead><tbody id="ntec-series-meta-rows"></tbody></table></div>
+  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table ntec-series-detail-table"><thead><tr><th>Série de controle</th><th>Peça / elemento concretado</th><th>Carga (horário)</th><th>CPs</th><th>Abatimento (mm)</th><th>Nº série BT</th><th>Nota fiscal</th><th>Volume (m³)</th></tr></thead><tbody id="ntec-series-meta-rows"></tbody></table></div>
   <small>O gerador cria as 10 séries e os 40 CPs. A carga real da prensa fica vazia até o ensaio. BT, nota fiscal, volumes e abatimentos pré-carregados são sugestões lidas visualmente do manuscrito: revise cada linha antes de salvar.</small>
   <small>Não preenchemos automaticamente números manuscritos incertos. Os resultados reais de ruptura devem ser lançados somente após o ensaio.</small>
   <small>O arquivo é processado no navegador e não é enviado a um serviço externo de OCR. É necessária conexão para carregar as bibliotecas de leitura.</small>
@@ -304,8 +304,8 @@ panel = r"""
      const tr=document.createElement('tr');
      const fields=[
        ['series',String(start+i).padStart(2,'0')],
+       ['piece','Vigas de travamento'],
        ['load-time',starts[i]||''],
-       ['molding-time',molding[i]||''],
        ['cp-count','4'],
 
        ['slump',String(values[i]??'')],
@@ -321,7 +321,7 @@ panel = r"""
  function ntecReadSeriesMetadata(){
    return [...document.querySelectorAll('#ntec-series-meta-rows tr')].map(tr=>{
      const read=k=>String(tr.querySelector('[data-series-meta="'+k+'"]')?.value||'').trim();
-     return {series:read('series'),loadTime:read('load-time'),moldingTime:read('molding-time'),cpCount:read('cp-count'),slump:read('slump'),bt:read('bt'),invoice:read('invoice'),volume:read('volume')};
+     return {series:read('series'),piece:read('piece'),loadTime:read('load-time'),cpCount:read('cp-count'),slump:read('slump'),bt:read('bt'),invoice:read('invoice'),volume:read('volume')};
    });
  }
  function ntecSyncSeriesMetadataToReport(){
@@ -332,7 +332,7 @@ panel = r"""
    const before=String(target.value||'');const keep=before.includes(marker)?before.slice(0,before.indexOf(marker)).trim():before.trim();
    const value=x=>x||'—';
    const header='PADRÃO CONFIRMADO: obra 1408 | moldagem 16/10/2026 | FCK 40 MPa | fornecedor Supermix | vigas de travamento | brita 0 e brita 1 | abatimento teórico 120 ± 20 mm | CPs cilíndricos 100 x 200 mm | 2 CPs aos 7 dias e 2 CPs aos 28 dias por série.';
-   const lines=rows.map(r=>'Série de controle '+value(r.series)+' | carga/horário '+value(r.loadTime)+' | moldagem '+value(r.moldingTime)+' | CPs '+value(r.cpCount)+' | abatimento '+value(r.slump)+' mm | BT '+value(r.bt)+' | nota fiscal '+value(r.invoice)+' | volume '+value(r.volume)+' m³');
+   const lines=rows.map(r=>'Série de controle '+value(r.series)+' | peça/elemento concretado '+value(r.piece)+' | carga/horário '+value(r.loadTime)+' | CPs '+value(r.cpCount)+' | abatimento '+value(r.slump)+' mm | BT '+value(r.bt)+' | nota fiscal '+value(r.invoice)+' | volume '+value(r.volume)+' m³');
    target.value=(keep?keep+'\n\n':'')+header+'\n'+marker+'\n'+lines.join('\n');
    target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));
  }
@@ -351,7 +351,7 @@ panel = r"""
      if(!el)continue;
      const label=box.querySelector('label')?.textContent||'';
      const key=ntecFormFieldNorm(label+' '+el.dataset.reportField);
-     if(/nota fiscal|invoice|ticket|serie lote de cp|serie.*lote.*cp|prensa identificacao|prensa|certificado.*calibracao|calibracao.*validade/.test(key)){
+     if(/nota fiscal|invoice|ticket|serie lote de cp|serie.*lote.*cp|prensa identificacao|prensa|certificado.*calibracao|calibracao.*validade|ordem de servico|abatimento medido|condicao.*local de cura|local de cura|horario de moldagem|peca.*elemento concretado|elemento concretado|local de aplicacao/.test(key)){
        box.remove();
        continue;
      }
@@ -363,7 +363,6 @@ panel = r"""
      else if(/\bfck\b|resistencia caracteristica|fck especificado/.test(key))value='40';
      else if(/dimensao dos cps|dimensoes dos cps|specimen dimensions/.test(key))value='100 x 200 mm';
      else if(/abatimento especificado|abatimento teorico|slump theor/.test(key))value='120 ± 20';
-     else if(/peca.*elemento concretado|elemento concretado|local de aplicacao/.test(key))value='Vigas de travamento';
      if(value!==null){
        if(el.type==='date')el.value='2026-10-16';
        else if(el.type==='number'&&/fck/.test(key))el.value='40';
