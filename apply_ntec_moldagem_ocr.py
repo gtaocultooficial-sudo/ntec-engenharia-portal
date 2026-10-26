@@ -188,7 +188,7 @@ panel = r"""
          const sc=ocrFieldScore(field,txt,rr.data.confidence);
          if(sc>best.score)best={score:sc,text:txt};
        }
-       if(best.score<0)best.text='';
+       const minimumScore=field.key==='supplier'?14:10;if(best.score<minimumScore)best.text='';
        return best;
      }
      const cropSuggestions=[];
