@@ -301,7 +301,7 @@ async function createRuptureRevision(reportId){
    const saved=await window.NTEC_SUPABASE.saveReport({
      projectId:report.project_id,title:revisionTitle,type:report.report_type,date:new Date().toISOString().slice(0,10),
      content:report.content||'',methodology:report.methodology||'',results,
-     observations:(observations?observations+'\n\n':'')+note,
+     observations:(observations?observations+String.fromCharCode(10)+String.fromCharCode(10):'')+note,
      technicalResponsible:report.technical_responsible||'',professionalRegistration:report.professional_registration||'',
      normativeReferences:report.normative_references||'',structuredData:data,status:'concluido'
    });
