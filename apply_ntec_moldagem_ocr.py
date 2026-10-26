@@ -291,7 +291,10 @@ panel = r"""
    const body=document.getElementById('ntec-series-meta-rows');if(!body)return;
    const starts=['06:46','07:20','08:25','08:38','09:10','11:25','11:40','12:50','14:00','14:50'];
    const molding=['08:15','08:40','09:15','10:00','10:21','12:21','13:30','13:21','14:55','15:40'];
-   const values=[140,130,140,120,130,130,120,140,120,120];
+   const values=[140,130,140,140,120,130,130,120,140,120];
+   const btNumbers=['2533','2793','2011','2006','2537','2118','2006','2309','2296','2309'];
+   const invoices=['174915','174917','174924','174922','174924','174936','174937','174943','174949','174954'];
+   const volumes=['10.0','10.0','8.0','8.0','10.0','8.0','8.0','8.0','8.0','8.0'];
    body.innerHTML='';
    for(let i=0;i<count;i++){
      const tr=document.createElement('tr');
@@ -302,9 +305,9 @@ panel = r"""
        ['cp-count','4'],
 
        ['slump',String(values[i]??'')],
-       ['bt',''],
-       ['invoice',''],
-       ['volume','']
+       ['bt',btNumbers[i]||''],
+       ['invoice',invoices[i]||''],
+       ['volume',volumes[i]||'']
      ];
      tr.innerHTML=fields.map(([key,value])=>'<td><input data-series-meta="'+key+'" aria-label="'+key+'" value="'+String(value).replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'"></td>').join('');
      body.appendChild(tr);
@@ -351,6 +354,7 @@ panel = r"""
      let value=null,numeric=null;
      if(/fck|resistencia caracteristica/.test(key)){value='40';numeric=40;}
      else if(/fornecedor|supplier/.test(key))value='Supermix';
+     else if(/construtora|empreiteira|contractor/.test(key))value='DP BARROS';
      else if(/abatimento teorico|slump teorico/.test(key)){value='120 ± 20 mm';numeric=120;}
      else if(/local de aplicacao|elemento estrutural|aplicacao/.test(key))value='Vigas de travamento';
      else if(/agregado|brita|granulometria/.test(key))value='Brita 0 e Brita 1';
