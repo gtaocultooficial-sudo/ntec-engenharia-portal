@@ -151,8 +151,14 @@ panel = r"""
    const idx=terms=>def.columns.findIndex(col=>terms.some(t=>normHeader(col).includes(t)));
    const ix={id:idx(['cp nº','cp n°','cp','amostra']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
    if(ix.id<0||ix.age<0||ix.date<0||ix.load<0){status('As colunas de CP, idade, data de ruptura e carga (tf) não foram encontradas na tabela do relatório. Nada foi transferido.');return;}
-   valid.forEach(r=>{const vals=Array(def.columns.length).fill('');vals[ix.id]=r.id;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);});
-   status(valid.length+' CP(s) transferido(s) para a tabela do relatório. Confira as datas, as idades e as cargas antes de salvar.');
+   const existing=[...document.querySelectorAll('tbody[data-report-matrix-rows="primary"] tr')].map(tr=>({id:String(tr.querySelector('[data-matrix-cell="'+ix.id+'"]')?.value||'').trim().toLowerCase(),age:String(tr.querySelector('[data-matrix-cell="'+ix.age+'"]')?.value||'').trim().toLowerCase()}));
+   let added=0,skipped=0;
+   valid.forEach(r=>{
+     const id=String(r.id||'').trim().toLowerCase(),age=String(r.age||'').trim().toLowerCase();
+     if((id||age)&&existing.some(x=>(id&&x.id===id)&&(!age||!x.age||x.age===age))){skipped++;return;}
+     const vals=Array(def.columns.length).fill('');vals[ix.id]=r.id;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age});
+   });
+   status(added+' CP(s) transferido(s) para a tabela do relatório'+(skipped?'; '+skipped+' possível(is) duplicado(s) ignorado(s)':'')+'. Confira as datas, as idades e as cargas antes de salvar.');
  });
  function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
  function valueAfter(text,labels){
