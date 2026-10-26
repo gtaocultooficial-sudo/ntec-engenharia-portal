@@ -79,14 +79,18 @@ panel = r"""
    return variants;
  }
  function ocrScore(text,confidence){
-   const raw=String(text||''),t=raw.toLowerCase(),terms=['formulario de moldagem','moldagem','concreto','argamassa','graute','codigo da obra','construtora','data','fornecedor','corpo de prova','abatimento','ruptura','resistencia','nota fiscal','volume'];
-   let score=terms.reduce((n,w)=>n+(t.includes(w)?6:0),0);
+   const raw=String(text||''),t=raw.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
+   // Pontua rótulos próprios do FORM02 para escolher orientação legível.
+   const anchors=['formulario de moldagem','codigo da obra','n serie campo','n serie controle','construtora','caracteristica do material','abatimento teorico','local de aplicacao','idades de ruptura','horario do moldador','total de cps coletados','recepcao no laboratorio','fornecedor','quantidade cps','moldagem','form02'];
+   let score=anchors.reduce((n,w)=>n+(t.includes(w)?12:0),0);
    const words=(raw.match(/[A-Za-zÀ-ÿ]{3,}/g)||[]).length;
    const chars=(raw.match(/[A-Za-zÀ-ÿ]/g)||[]).length;
+   const digits=(raw.match(/\\d/g)||[]).length;
    const junk=(raw.match(/[|{}~\\[\\]<>]/g)||[]).length;
-   score+=Math.min(words,80)*0.18+Math.min(chars/80,8);
-   score-=junk*0.35;
-   if(Number.isFinite(confidence))score+=confidence*0.12;
+   score+=Math.min(words,100)*0.22+Math.min(chars/60,10)+Math.min(digits,80)*0.05;
+   score+=(chars/Math.max(1,raw.length))*12;
+   score-=junk*0.5;
+   if(Number.isFinite(confidence))score+=confidence*0.2;
    return score;
  }
  async function getPages(file){
@@ -112,7 +116,34 @@ panel = r"""
      status('Preparando o reconhecimento em português…');
      const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
-     try{for(let i=0;i<pages.length;i++){status('Preparando página '+(i+1)+' de '+pages.length+'…');const variants=makeOcrVariants(pages[i]);let best={score:-1,text:'',angle:0,mode:'6'};for(const variant of variants){for(const mode of ['6','11','12']){status('Lendo página '+(i+1)+' — rotação '+variant.angle+'°, modo '+mode+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const result=await worker.recognize(variant.canvas);const score=ocrScore(result.data.text,result.data.confidence);if(score>best.score)best={score,text:result.data.text,angle:variant.angle,mode,canvas:variant.canvas};}}const regions=[{name:'CABEÇALHO',from:0,to:0.34,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.25,to:0.82,left:0,right:1},{name:'TABELA — METADE ESQUERDA',from:0.25,to:0.82,left:0,right:0.52},{name:'TABELA — METADE DIREITA',from:0.25,to:0.82,left:0.48,right:1},{name:'TABELA — COLUNAS INICIAIS',from:0.30,to:0.80,left:0,right:0.34},{name:'TABELA — COLUNAS CENTRAIS',from:0.30,to:0.80,left:0.28,right:0.70},{name:'TABELA — COLUNAS FINAIS',from:0.30,to:0.80,left:0.64,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.76,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11','12']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\\n'+regionBest.text);}output.push('--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\\n'+best.text+'\\n\\n'+regionText.join('\\n\\n'));}}
+     try{for(let i=0;i<pages.length;i++){status('Preparando página '+(i+1)+' de '+pages.length+'…');const variants=makeOcrVariants(pages[i]);let best={score:-1,text:'',angle:0,mode:'6'};for(const variant of variants){for(const mode of ['6','11','12']){status('Lendo página '+(i+1)+' — rotação '+variant.angle+'°, modo '+mode+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const result=await worker.recognize(variant.canvas);const score=ocrScore(result.data.text,result.data.confidence);if(score>best.score)best={score,text:result.data.text,angle:variant.angle,mode,canvas:variant.canvas};}}const fieldCrops=[
+       {label:'Código da obra',left:.495,right:.585,top:.045,bottom:.135},
+       {label:'Data da moldagem',left:.585,right:.715,top:.045,bottom:.135},
+       {label:'Construtora',left:.085,right:.255,top:.135,bottom:.205},
+       {label:'Endereço',left:.285,right:.425,top:.135,bottom:.205},
+       {label:'Fornecedor',left:.405,right:.535,top:.175,bottom:.245},
+       {label:'FCK',left:.045,right:.165,top:.195,bottom:.26},
+       {label:'Abatimento teórico',left:.265,right:.405,top:.195,bottom:.26},
+       {label:'Local de aplicação',left:.285,right:.525,top:.30,bottom:.66}
+     ];
+     const cropSuggestions=[];
+     for(const f of fieldCrops){
+       const crop=document.createElement('canvas');
+       const x=Math.round(best.canvas.width*f.left),y=Math.round(best.canvas.height*f.top);
+       crop.width=Math.max(1,Math.round(best.canvas.width*(f.right-f.left)));
+       crop.height=Math.max(1,Math.round(best.canvas.height*(f.bottom-f.top)));
+       crop.getContext('2d').drawImage(best.canvas,x,y,crop.width,crop.height,0,0,crop.width,crop.height);
+       let cellBest={score:-1,text:''};
+       for(const mode of ['7','6']){
+         await worker.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1'});
+         const rr=await worker.recognize(crop);
+         const txt=String(rr.data.text||'').replace(/\\s+/g,' ').trim();
+         const sc=ocrScore(txt,rr.data.confidence);
+         if(sc>cellBest.score)cellBest={score:sc,text:txt};
+       }
+       cropSuggestions.push(f.label+': '+(cellBest.text||'[não reconhecido]'));
+     }
+     const regions=[{name:'CABEÇALHO',from:0,to:0.34,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.25,to:0.82,left:0,right:1},{name:'TABELA — METADE ESQUERDA',from:0.25,to:0.82,left:0,right:0.52},{name:'TABELA — METADE DIREITA',from:0.25,to:0.82,left:0.48,right:1},{name:'TABELA — COLUNAS INICIAIS',from:0.30,to:0.80,left:0,right:0.34},{name:'TABELA — COLUNAS CENTRAIS',from:0.30,to:0.80,left:0.28,right:0.70},{name:'TABELA — COLUNAS FINAIS',from:0.30,to:0.80,left:0.64,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.76,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11','12']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\\n'+regionBest.text);}output.push('--- CAMPOS DETECTADOS POR RECORTE (confira) ---\\n'+cropSuggestions.join('\\n')+'\\n\\n--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\\n'+best.text+'\\n\\n'+regionText.join('\\n\\n'));}}
      finally{await worker.terminate();}
      textEl.value=output.join('\n\n');status('Leitura concluída. Confira o texto; a escrita manual pode gerar erros. Clique em “Aplicar sugestões” para preencher os campos reconhecidos.');
    }catch(e){const detail=(e&&typeof e.message==='string'&&e.message.trim())?e.message:(typeof e==='string'?e:(e&&e.name?e.name+' (verifique conexão, bloqueio de CDN ou formato do arquivo)':String(e)));status('Falha na leitura automática: '+detail+'. Tente JPG/PNG ou PDF menor que 20 MB; se persistir, envie a mensagem exata para diagnóstico.');console.error('NTEC OCR error:',e);}
