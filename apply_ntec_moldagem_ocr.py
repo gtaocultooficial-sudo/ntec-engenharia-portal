@@ -258,6 +258,7 @@ panel = r"""
 
  function ntecDefaultControlSeries(){
    let maximum=0;const pid=String(document.getElementById('reportproject')?.value||'');
+   if(!pid)return 1;
    const pool=Array.isArray(reports)?reports:[];
    for(const report of pool){
      if(pid&&String(report.project_id||report.projectId||'')!==pid)continue;
@@ -440,7 +441,7 @@ panel = r"""
    };
    const ix={
      id:idx(['identificação do cp','identificacao do cp','cp nº','cp n°','nº do cp','numero do cp','amostra nº','amostra n°','amostra','cp']),
-     series:idx(['nº da série de controle','numero da serie de controle','nº série','numero da serie','série de controle','serie de controle','série da moldagem','serie da moldagem']),
+     series:idx(['nº da série de controle','numero da serie de controle','nº de série de controle','numero de serie de controle','nº série','nº de série','numero da serie','numero de serie','série de controle','serie de controle','série da moldagem','serie da moldagem']),
      age:idx(['idade (dias)','idade dias','idade']),
      date:idx(['data de ruptura','data prevista de ruptura','data prevista','ruptura']),
      load:idx(['carga (tf)','carga de ruptura','carga real','carga'])
