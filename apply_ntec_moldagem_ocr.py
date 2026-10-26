@@ -67,12 +67,12 @@ panel = r"""
    try{
      status('Carregando leitor de texto…');
      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);
-     const pages=await getPages(file),worker=await Tesseract.createWorker('por+eng',1,{logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
+     const pages=await getPages(file);\n     status('Preparando o reconhecimento em português…');\n     const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
      try{for(let i=0;i<pages.length;i++){status('Lendo página '+(i+1)+' de '+pages.length+'…');const result=await worker.recognize(pages[i]);output.push('--- Página '+(i+1)+' ---\n'+result.data.text);if(typeof ImageBitmap!=='undefined'&&pages[i] instanceof ImageBitmap)pages[i].close?.();}}
      finally{await worker.terminate();}
      textEl.value=output.join('\n\n');status('Leitura concluída. Confira o texto; a escrita manual pode gerar erros. Clique em “Aplicar sugestões” para preencher os campos reconhecidos.');
-   }catch(e){status('Não foi possível ler o arquivo: '+(e&&e.message?e.message:'erro desconhecido')+'. Você ainda pode corrigir o texto manualmente.');}
+   }catch(e){const detail=(e&&typeof e.message==='string'&&e.message.trim())?e.message:(typeof e==='string'?e:(e&&e.name?e.name+' (verifique conexão, bloqueio de CDN ou formato do arquivo)':String(e)));status('Falha na leitura automática: '+detail+'. Tente JPG/PNG ou PDF menor que 20 MB; se persistir, envie a mensagem exata para diagnóstico.');console.error('NTEC OCR error:',e);}
    finally{readBtn.disabled=false;}
  });
  function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
