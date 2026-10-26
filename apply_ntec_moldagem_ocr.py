@@ -22,9 +22,9 @@ panel = r"""
   <button type="button" class="btn secondary" id="ntec-ocr-apply">Aplicar sugestões aos campos</button>
   <hr>
   <h4>Conferência dos corpos de prova (CPs)</h4>
-  <p>Cada linha da ficha original representa uma <b>série de moldagem</b>. Cadastre a série uma vez e informe abaixo cada CP dessa série, com sua idade e previsão de ruptura. A previsão não é a data real do ensaio; resultados podem ser lançados depois, inclusive parcialmente.</p>
+  <p>Cada linha da ficha original representa uma série de moldagem. Use o <b>nº da série de controle</b> para vincular a série à obra e manter a sequência; não cadastre a série de campo, que permanece zerada. Informe cada CP da série, sua idade e data prevista de ruptura. A previsão não é a data real do ensaio; os resultados podem ser lançados depois, inclusive parcialmente.</p>
   <div class="ntec-ocr-controls"><button type="button" class="btn secondary" id="ntec-cp-add">+ Adicionar CP</button><button type="button" class="btn secondary" id="ntec-cp-transfer">Transferir CPs conferidos para o relatório</button></div>
-  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Série da moldagem</th><th>Identificação do CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga real (tf), se ensaiado</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
+  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Nº da série de controle</th><th>Identificação do CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga real (tf), se ensaiado</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
   <small>Não preenchemos automaticamente números duvidosos da escrita manual. Os resultados reais de ruptura devem ser lançados somente após o ensaio.</small>
   <small>O arquivo é processado no navegador e não é enviado a um serviço externo de OCR. É necessária conexão para carregar as bibliotecas de leitura.</small>
 </div>
