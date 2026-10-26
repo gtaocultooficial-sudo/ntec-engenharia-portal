@@ -273,7 +273,7 @@ panel = r"""
            const cells=Array.isArray(row)?row:[];
            if(si>=0){const cell=cells[si],raw=cell&&typeof cell==='object'?(cell.value||''):cell;const n=Number.parseInt(raw,10);if(Number.isInteger(n)&&n>maximum)maximum=n;}
            const text=cells.map(c=>String(c&&typeof c==='object'?(c.value||''):c||'')).join(' ');
-           for(const m of text.matchAll(/s[ée]rie\\s*0*(\\d+)\\s*(?:\\/|-)\\s*cp/gi))maximum=Math.max(maximum,Number(m[1])||0);
+           for(const m of text.matchAll(/s[ée]rie\s*0*(\d+)\s*(?:\/|-)\s*cp/gi))maximum=Math.max(maximum,Number(m[1])||0);
          }
        }
        Object.values(value).forEach(inspect);
