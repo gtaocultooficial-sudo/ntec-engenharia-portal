@@ -424,9 +424,21 @@ panel = r"""
    if(document.getElementById('reporttype')?.value!=='ruptura_concreto'){status('Selecione o tipo “Ruptura de concreto” para transferir CPs.');return;}
    if(typeof matrixDefinition!=='function'||typeof addReportMatrixRow!=='function'){status('A tabela do relatório não está disponível. Reabra o formulário e tente novamente.');return;}
    const def=matrixDefinition('primary');if(!def?.columns?.length){status('Não foi possível identificar as colunas do relatório.');return;}
-   const normHeader=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-   const idx=terms=>def.columns.findIndex(col=>terms.some(t=>normHeader(col).includes(t)));
-   const ix={id:idx(['identificação do cp','identificacao do cp','cp nº','cp n°','cp','amostra']),series:idx(['nº série','numero da serie','série da moldagem','serie da moldagem']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
+   const normHeader=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+   const idx=terms=>{
+     const wanted=terms.map(normHeader);
+     const exact=def.columns.findIndex(col=>wanted.includes(normHeader(col)));
+     if(exact>=0)return exact;
+     // Prefix matching prevents a header such as "Dimensões do CP" from being mistaken for the CP identifier.
+     return def.columns.findIndex(col=>wanted.some(t=>normHeader(col).startsWith(t)));
+   };
+   const ix={
+     id:idx(['identificação do cp','identificacao do cp','cp nº','cp n°','nº do cp','numero do cp','amostra nº','amostra n°','amostra','cp']),
+     series:idx(['nº da série de controle','numero da serie de controle','nº série','numero da serie','série de controle','serie de controle','série da moldagem','serie da moldagem']),
+     age:idx(['idade (dias)','idade dias','idade']),
+     date:idx(['data de ruptura','data prevista de ruptura','data prevista','ruptura']),
+     load:idx(['carga (tf)','carga de ruptura','carga real','carga'])
+   };
    if(ix.id<0||ix.age<0){status('Não foi possível localizar as colunas de identificação do CP e idade na tabela do relatório. Nada foi transferido; confira o modelo de relatório.');return;}if(ix.date<0)ix.date=idx(['data prevista','previsão de ruptura','previsao de ruptura']);if(ix.date<0){status('Não foi localizada uma coluna de data de ruptura/previsão no relatório. Nada foi transferido.');return;}
    if(ix.series===ix.id)ix.series=-1;
    const existing=[...document.querySelectorAll('tbody[data-report-matrix-rows="primary"] tr')].map(tr=>({id:String(tr.querySelector('[data-matrix-cell="'+ix.id+'"]')?.value||'').trim().toLowerCase(),age:String(tr.querySelector('[data-matrix-cell="'+ix.age+'"]')?.value||'').trim().toLowerCase(),series:ix.series>=0?String(tr.querySelector('[data-matrix-cell="'+ix.series+'"]')?.value||'').trim().toLowerCase():''}));
