@@ -41,6 +41,13 @@ replacement = r"""function printNtecReport(id){
  };
  const reportHeading=headings[type]||String(r.typeLabel||r.report_type||'RELATÓRIO TÉCNICO').toLocaleUpperCase('pt-BR');
  const norm=String(r.normative_references||tpl.norms||'').trim();
+ const reportMatrixText=String(tables.primary||'').trim();
+ const reportMatrixRows=reportMatrixText?reportMatrixText.split(/\r?\n/).filter(Boolean).map(line=>line.split('|').map(v=>v.trim())):[];
+ const normAgeHeader=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const reportAgeIndex=(tpl.matrix?.columns||[]).findIndex(col=>normAgeHeader(col).includes('idade'));
+ const reportAges=reportAgeIndex>=0?reportMatrixRows.map(row=>Number(String(row[reportAgeIndex]||'').replace(',','.'))):[];
+ const hasSevenAnd28Days=reportAges.includes(7)&&reportAges.includes(28);
+ const initialSevenDayIssue=type==='ruptura_concreto'&&revisionNumber===0&&hasSevenAnd28Days;
  const escVal=value=>esc(value==null||String(value).trim()===''?'—':String(value));
  const section=(title,value)=>value&&String(value).trim()?'<section class="n-section"><div class="n-section-title">'+esc(title)+'</div><div class="n-text">'+esc(String(value).trim())+'</div></section>':'';
  const pairRows=items=>{
@@ -60,7 +67,7 @@ replacement = r"""function printNtecReport(id){
   {label:'CÓDIGO DA OBRA',value:fields.record_number||workCode},
   {label:'RELATÓRIO Nº',value:reportNumber},
   {label:'DATA DO RELATÓRIO',value:fmtDate(dateValue)},
-  {label:'STATUS',value:typeof ntecReportStatusText==='function'?ntecReportStatusText(r):(r.statusLabel||r.status||'Rascunho')},
+  {label:'STATUS',value:initialSevenDayIssue?'Emissão inicial — resultados de 7 dias':revisionNumber>0?'Revisão '+String(revisionNumber).padStart(2,'0')+' — resultados de 7 e 28 dias':(typeof ntecReportStatusText==='function'?ntecReportStatusText(r):(r.statusLabel||r.status||'Rascunho'))},
   {label:'FORNECEDOR',value:fields.supplier||fields.concrete_supplier||fields.vendor||'—'},
   ...(revisionNumber>0?[{label:'REVISÃO',value:'Revisão '+String(revisionNumber).padStart(2,'0')},{label:'RELATÓRIO ORIGINAL',value:revisionParent||'Não informado'}]:[])
  ];
