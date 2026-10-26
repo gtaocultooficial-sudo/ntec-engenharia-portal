@@ -12,6 +12,9 @@ replacement = r"""function printNtecReport(id){
  const tpl=REPORT_TEMPLATES[type]||REPORT_TEMPLATES.outro||{};
  const sd=r.structured_data||{},fields=sd.fields||{},tables=sd.matrix||{};
  const reportNumber=r.report_number||fields.report_number||'Não informado';
+ const revisionMeta=sd.revision&&typeof sd.revision==='object'?sd.revision:{};
+ const revisionNumber=Math.max(0,Number(revisionMeta.number??fields.report_revision_number??0)||0);
+ const revisionParent=String(revisionMeta.parent_report_number||fields.report_revision_of_number||'').trim();
  const workCode=r.work_number?'OBRA'+String(r.work_number).padStart(3,'0'):(fields.record_number||'Não informado');
  const dateValue=r.report_date||'';
  const fmtDate=value=>{
@@ -58,14 +61,25 @@ replacement = r"""function printNtecReport(id){
   {label:'RELATÓRIO Nº',value:reportNumber},
   {label:'DATA DO RELATÓRIO',value:fmtDate(dateValue)},
   {label:'STATUS',value:typeof ntecReportStatusText==='function'?ntecReportStatusText(r):(r.statusLabel||r.status||'Rascunho')},
-  {label:'FORNECEDOR',value:fields.supplier||fields.concrete_supplier||fields.vendor||'—'}
+  {label:'FORNECEDOR',value:fields.supplier||fields.concrete_supplier||fields.vendor||'—'},
+  ...(revisionNumber>0?[{label:'REVISÃO',value:'Revisão '+String(revisionNumber).padStart(2,'0')},{label:'RELATÓRIO ORIGINAL',value:revisionParent||'Não informado'}]:[])
  ];
  const fieldDefs=(tpl.fields||[]).filter(f=>!['report_number','record_number','series'].includes(f.name)&&String(fields[f.name]??'').trim()!=='');
  const detailPairs=fieldDefs.map(f=>({label:f.label,value:fmtValue(f,fields[f.name])}));
  const fieldHtml=detailPairs.length?'<div class="n-section-title">IDENTIFICAÇÃO E DADOS DO ENSAIO</div><table class="n-info"><tbody>'+pairRows(detailPairs)+'</tbody></table>':'';
- const resultTable=(text,columns,label)=>{
+ const resultTable=(text,columns,label,isPrimary=false)=>{
   if(!String(text||'').trim()||!columns?.length)return '';
-  const rows=String(text).trim().split(/\r?\n/).filter(line=>line.trim()).map(line=>line.split('|').map(cell=>cell.trim()));
+  let rows=String(text).trim().split(/\r?\n/).filter(line=>line.trim()).map(line=>line.split('|').map(cell=>cell.trim()));
+  // First issuance shows only 7-day samples when the dataset contains both 7- and 28-day CPs.
+  // A later revision explicitly carries both ages and their measured results.
+  if(type==='ruptura_concreto'&&isPrimary&&revisionNumber===0){
+    const normHeader=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const ageIndex=columns.findIndex(col=>normHeader(col).includes('idade'));
+    if(ageIndex>=0){
+      const ages=rows.map(row=>{const raw=String(row[ageIndex]||'').replace(',','.');return Number(raw)});
+      if(ages.includes(7)&&ages.includes(28))rows=rows.filter(row=>Number(String(row[ageIndex]||'').replace(',','.'))===7);
+    }
+  }
   const isPress=['ruptura_concreto','testemunhos_concreto','prismas_alvenaria','blocos_concreto','graute_alvenaria'].includes(type);
   const head=columns.map(col=>isPress&&/carga\s*\(kN\)/i.test(String(col))?String(col).replace(/\(kN\)/i,'(tf)'):String(col));
   const body=rows.map(row=>{
@@ -77,7 +91,7 @@ replacement = r"""function printNtecReport(id){
  };
  const series=String(fields.series||'').trim();
  const seriesBar=series?'<div class="n-series">SÉRIE / LOTE DE CP: '+esc(series)+'</div>':'';
- const mainTable=resultTable(tables.primary,tpl.matrix?.columns,tpl.matrix?.label);
+ const mainTable=resultTable(tables.primary,tpl.matrix?.columns,tpl.matrix?.label,true);
  const extraTable=resultTable(tpl.extraMatrix?tables[tpl.extraMatrix.name]:'',tpl.extraMatrix?.columns,tpl.extraMatrix?.label);
  const ntecGrowthChart=(text,columns)=>{
   if(type!=='ruptura_concreto')return '';
