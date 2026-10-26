@@ -269,7 +269,16 @@ panel = r"""
  applyBtn.addEventListener('click',()=>{
    const t=textEl.value,previewHasData=[...document.querySelectorAll('[data-ocr-field]')].some(el=>String(el.value||'').trim());
    if(!t.trim()&&!previewHasData){status('Faça a leitura da ficha ou preencha ao menos um campo de conferência antes de aplicar.');return;}
-   let filled=0;
+   let filled=0,matchedWorkCode='';
+   const workCodeMatch=ocrCandidate('work_code').match(/\d{3,6}/),projectSelect=document.getElementById('reportproject');
+   if(workCodeMatch&&projectSelect){
+     const digits=workCodeMatch[0],compact=value=>String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+     const expected='obra'+digits.padStart(3,'0');
+     const matches=[...projectSelect.options].filter(o=>compact(o.textContent).includes(expected));
+     if(matches.length===1&&projectSelect.value!==matches[0].value){
+       projectSelect.value=matches[0].value;projectSelect.dispatchEvent(new Event('change',{bubbles:true}));filled++;matchedWorkCode=digits;
+     }else if(matches.length===1){matchedWorkCode=digits;}
+   }
    const dateRaw=ocrCandidate('casting_date')||valueAfter(t,['data da moldagem','data de moldagem','data da coleta']);
    const dateMatch=dateRaw.match(/(\d{1,2})[\s\/.,'-](\d{1,2})[\s\/.,'-](\d{2,4})/);
    if(dateMatch){let y=dateMatch[3];if(y.length===2)y='20'+y;const iso=y+'-'+dateMatch[2].padStart(2,'0')+'-'+dateMatch[1].padStart(2,'0');const el=document.querySelector('[data-report-field="casting_date"]');if(fillField(el,iso))filled++;}
@@ -308,7 +317,7 @@ panel = r"""
    const checkedGrout=/graute\s*(?:\(\s*[xX]\s*\)|\[\s*[xX]\s*\]|[✓✔☒☑])/i.test(material);
    const selectedType=checkedConcrete&&!checkedMortar&&!checkedGrout?'ruptura_concreto':checkedMortar&&!checkedConcrete&&!checkedGrout?'compressao_argamassa':checkedGrout&&!checkedConcrete&&!checkedMortar?'graute_alvenaria':'';
    if(typeEl&&selectedType&&[...typeEl.options].some(o=>o.value===selectedType)){typeEl.value=selectedType;typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
-   status('Sugestões aplicadas: '+filled+' campo(s). A leitura agora prioriza recortes separados dos campos; confira os valores e a tabela antes de salvar. O tipo do material só é alterado quando a marcação do formulário é inequívoca.');
+   status('Sugestões aplicadas: '+filled+' campo(s).'+(matchedWorkCode?' Obra vinculada pelo código '+matchedWorkCode+'.':'')+' Confira os valores e a tabela antes de salvar. O tipo do material só é alterado quando a marcação do formulário é inequívoca.');
  });
 })();
 </script>
