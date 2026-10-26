@@ -260,13 +260,71 @@ rx(r"function renderReports\(\)\{.*?\}\s*function matrixHtml",
  panel.innerHTML='<strong>⚠️ Atenção: rupturas pendentes</strong><div style="font-size:13px;margin-top:5px">Os CPs abaixo atingiram ou estão próximos da idade prevista e ainda não têm carga de prensa registrada. A data é uma previsão; se o ensaio não foi realizado, mantenha o lançamento pendente e atualize quando ocorrer.</div>'+rows;
  panel.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
 }
+function ntecRuptureRevisionProgress(report){
+ const columns=ntecReportMatrixColumns(),rows=ntecRuptureRows(report);
+ const ageIndex=ntecRuptureHeaderIndex(columns,'age'),loadIndex=ntecRuptureHeaderIndex(columns,'load'),resIndex=ntecRuptureHeaderIndex(columns,'resistance');
+ if(ageIndex<0||loadIndex<0||resIndex<0)return {total:0,missing:0,ready:false};
+ const target=rows.filter(row=>[7,28].includes(ntecRuptureParseNumber(row[ageIndex])));
+ const has7=target.some(row=>ntecRuptureParseNumber(row[ageIndex])===7),has28=target.some(row=>ntecRuptureParseNumber(row[ageIndex])===28);
+ const missing=target.filter(row=>!(ntecRuptureParseNumber(row[loadIndex])>0&&ntecRuptureParseNumber(row[resIndex])>0)).length;
+ return {total:target.length,missing,has7,has28,ready:target.length>0&&has7&&has28&&missing===0};
+}
+function ntecExistingRevisionFor(report){
+ return reports.find(item=>{
+   const revision=item.structured_data?.revision||{};
+   return String(revision.parent_report_id||'')===String(report.id)&&Number(revision.number||0)===1;
+ });
+}
+async function createRuptureRevision(reportId){
+ const report=reports.find(item=>String(item.id)===String(reportId));
+ if(!report||report.report_type!=='ruptura_concreto')return alert('A revisão está disponível para relatórios de ruptura de concreto.');
+ if(Number(report.structured_data?.revision?.number||report.structured_data?.fields?.report_revision_number||0)>0)return alert('Este documento já é uma revisão. Crie novas revisões a partir do relatório original para manter o histórico.');
+ const prior=ntecExistingRevisionFor(report);
+ if(prior)return alert('A Revisão 01 já existe ('+(prior.report_number||prior.title)+'). Abra esse documento para consultar ou emitir o PDF.');
+ const progress=ntecRuptureRevisionProgress(report);
+ if(!progress.ready)return alert('Ainda não é possível emitir a revisão 7 + 28 dias. Faltam resultados reais em '+progress.missing+' CP(s) de 7/28 dias. Lance a carga da prensa e confira a resistência de todos os CPs dessas idades primeiro.');
+ if(!confirm('Criar uma cópia revisada do relatório '+(report.report_number||'')+' contendo os resultados de 7 e 28 dias? O relatório original será preservado.'))return;
+ const button=[...document.querySelectorAll('[data-rp-revision]')].find(el=>String(el.dataset.rpRevision)===String(report.id));
+ if(button){button.disabled=true;button.textContent='Criando revisão…';}
+ try{
+   const data=JSON.parse(JSON.stringify(report.structured_data||{}));
+   data.fields=data.fields||{};
+   data.revision={number:1,parent_report_id:report.id,parent_report_number:report.report_number||'',issued_at:new Date().toISOString(),ages:[7,28]};
+   data.fields.report_revision_number=1;
+   data.fields.report_revision_of_number=report.report_number||'';
+   data.fields.report_revision_of_id=report.id;
+   const columns=ntecReportMatrixColumns(),rows=ntecRuptureRows(report);
+   const results=ntecRuptureSummary(rows,columns);
+   const revisionTitle=String(report.title||'Relatório de ruptura').replace(/\s*[—-]\s*Revisão\s*\d+.*$/i,'')+' — Revisão 01 (7 e 28 dias)';
+   const note='REVISÃO 01 — consolida os resultados de 7 e 28 dias. Documento de origem: '+(report.report_number||'relatório original')+'. O relatório original foi preservado no histórico.';
+   const observations=String(report.observations||'').trim();
+   const saved=await window.NTEC_SUPABASE.saveReport({
+     projectId:report.project_id,title:revisionTitle,type:report.report_type,date:new Date().toISOString().slice(0,10),
+     content:report.content||'',methodology:report.methodology||'',results,
+     observations:(observations?observations+'\n\n':'')+note,
+     technicalResponsible:report.technical_responsible||'',professionalRegistration:report.professional_registration||'',
+     normativeReferences:report.normative_references||'',structuredData:data,status:'concluido'
+   });
+   reports=await window.NTEC_SUPABASE.loadReports();renderReports();
+   const created=reports.find(item=>String(item.id)===String(saved?.id||'')||String(item.structured_data?.revision?.parent_report_id||'')===String(report.id));
+   alert('Revisão 01 criada'+(created?.report_number?' — '+created.report_number:'')+'. O PDF revisado inclui os CPs de 7 e 28 dias. O relatório original foi mantido.');
+ }catch(err){
+   alert('Não foi possível criar a revisão: '+(err?.message||'erro desconhecido'));
+   if(button){button.disabled=false;button.textContent='Gerar revisão 7 + 28 dias';}
+ }
+}
 function renderReports(){
  const body=document.getElementById('reportsbody');
  body.innerHTML=reports.length?reports.map(r=>{
   const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" data-rp-report="'+esc(r.id)+'">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
-  return '<tr><td><strong>'+esc(r.report_number||'Número pendente')+'</strong><div>'+esc(r.title)+'</div><div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+'<button class="btn" data-rp-edit="'+esc(r.id)+'">Editar</button> <button class="btn" data-rp-pdf="'+esc(r.id)+'">PDF</button></td></tr>';
+  const revisionNumber=Number(r.structured_data?.revision?.number||r.structured_data?.fields?.report_revision_number||0);
+  const priorRevision=revisionNumber===0&&r.report_type==='ruptura_concreto'?ntecExistingRevisionFor(r):null;
+  const revisionProgress=revisionNumber===0&&r.report_type==='ruptura_concreto'?ntecRuptureRevisionProgress(r):null;
+  const revisionButton=revisionNumber>0?'<span class="muted small">Revisão '+String(revisionNumber).padStart(2,'0')+'</span> ':priorRevision?'<span class="muted small">Revisão 01 já criada</span> ':revisionProgress?'<button class="btn secondary" data-rp-revision="'+esc(r.id)+'" '+(revisionProgress.ready?'':'disabled')+' title="'+(revisionProgress.ready?'Criar documento revisado com os resultados de 7 e 28 dias':'Faltam '+revisionProgress.missing+' resultados reais de CPs aos 7/28 dias')+'">'+(revisionProgress.ready?'Gerar revisão 7 + 28 dias':'Revisão 7 + 28 dias ('+revisionProgress.missing+' pendentes)')+'</button> ':'';
+  return '<tr><td><strong>'+esc(r.report_number||'Número pendente')+'</strong><div>'+esc(r.title)+'</div><div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(r.typeLabel||r.report_type)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+revisionButton+'<button class="btn" data-rp-edit="'+esc(r.id)+'">Editar</button> <button class="btn" data-rp-pdf="'+esc(r.id)+'">PDF</button></td></tr>';
  }).join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>';
  body.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
+ body.querySelectorAll('[data-rp-revision]').forEach(button=>button.addEventListener('click',()=>createRuptureRevision(button.dataset.rpRevision)));
  body.querySelectorAll('[data-rp-edit]').forEach(button=>button.addEventListener('click',()=>editReport(button.dataset.rpEdit)));
  body.querySelectorAll('[data-rp-pdf]').forEach(button=>button.addEventListener('click',()=>printNtecReport(button.dataset.rpPdf)));
  ntecRenderRuptureAlerts();
