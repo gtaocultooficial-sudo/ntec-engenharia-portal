@@ -175,6 +175,37 @@ panel = r"""
    const date=tr.querySelector('[data-cp="date"]');date.dataset.cpDate='1';
    if(!date.value&&tr.querySelector('[data-cp="age"]').value)date.value=cpDateFromAge(tr.querySelector('[data-cp="age"]').value);
  }
+
+ function ntecNextControlSeries(){
+   const el=document.querySelector('[data-report-field="series"]');
+   const n=Number.parseInt(el?.value||'',10);
+   return Number.isInteger(n)&&n>0?n:1;
+ }
+ document.getElementById('ntec-cp-generate')?.addEventListener('click',()=>{
+   const count=Number.parseInt(document.getElementById('ntec-cp-series-count')?.value||'',10);
+   const ages=String(document.getElementById('ntec-cp-ages')?.value||'').split(/[;,]/).map(x=>Number.parseInt(x.trim(),10));
+   const qtys=String(document.getElementById('ntec-cp-age-counts')?.value||'').split(/[;,]/).map(x=>Number.parseInt(x.trim(),10));
+   if(!Number.isInteger(count)||count<1||count>10){status('Informe de 1 a 10 linhas de série preenchidas.');return;}
+   if(!ages.length||ages.length!==qtys.length||ages.some(n=>!Number.isInteger(n)||n<0)||qtys.some(n=>!Number.isInteger(n)||n<0||n>20)||qtys.reduce((a,b)=>a+b,0)<1){status('Confira as idades e a quantidade de CPs por idade. Use a mesma quantidade de idades e números de CPs.');return;}
+   if(document.getElementById('reporttype')?.value!=='ruptura_concreto'){status('Selecione “Ruptura de concreto” antes de gerar os CPs.');return;}
+   const existingRows=[...document.querySelectorAll('#ntec-cp-rows tr')];
+   if(existingRows.some(tr=>['series','id','age','date','load'].some(k=>String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()))&&!confirm('Substituir as linhas de CPs que já estão na conferência?'))return;
+   const body=document.getElementById('ntec-cp-rows');body.innerHTML='';
+   const start=ntecNextControlSeries();let total=0;
+   for(let si=0;si<count;si++){
+     const controlSeries=start+si;let cpNo=1;
+     ages.forEach((age,ai)=>{
+       for(let j=0;j<qtys[ai];j++){
+         const cpId='CP'+String(cpNo).padStart(2,'0');
+         addOcrCpRow({series:String(controlSeries),id:cpId,age:String(age),date:cpDateFromAge(age),load:''});
+         cpNo++;total++;
+       }
+     });
+   }
+   const seriesField=document.querySelector('[data-report-field="series"]');
+   if(seriesField){seriesField.value=String(start+count-1);seriesField.dataset.ntecManualSeries='1';seriesField.dispatchEvent(new Event('input',{bubbles:true}));seriesField.dispatchEvent(new Event('change',{bubbles:true}));}
+   status('Gerados '+total+' CP(s) em '+count+' série(s) de controle, da série '+start+' à '+(start+count-1)+'. Confira a distribuição por idade e depois transfira para o relatório. Nenhuma carga real foi preenchida.');
+ });
  document.getElementById('ntec-cp-add')?.addEventListener('click',()=>addOcrCpRow());
  document.getElementById('ntec-cp-rows')?.addEventListener('click',e=>{if(e.target.closest('[data-cp-remove]'))e.target.closest('tr')?.remove()});
  document.getElementById('ntec-cp-rows')?.addEventListener('input',e=>{
