@@ -330,6 +330,10 @@ panel = r"""
    target.dispatchEvent(new Event('input',{bubbles:true}));target.dispatchEvent(new Event('change',{bubbles:true}));
  }
  document.getElementById('ntec-cp-use-form02')?.addEventListener('click',()=>{
+   const staged=[...document.querySelectorAll('#ntec-cp-rows tr')];
+   const hasStaged=staged.some(tr=>['series','id','age','date','load'].some(k=>String(tr.querySelector('[data-cp="'+k+'"]')?.value||'').trim()));
+   if(hasStaged&&!confirm('Substituir os CPs que já estão na conferência pelo padrão de 10 séries desta ficha?'))return;
+   if(hasStaged){const stagedBody=document.getElementById('ntec-cp-rows');if(stagedBody)stagedBody.innerHTML='';}
    const typeEl=document.getElementById('reporttype');
    if(typeEl&&[...typeEl.options].some(o=>o.value==='ruptura_concreto')){typeEl.value='ruptura_concreto';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
    const projectSelect=document.getElementById('reportproject');
@@ -367,8 +371,14 @@ panel = r"""
    const start=ntecDefaultControlSeries();document.getElementById('ntec-cp-start-series').value=String(start);
    ntecRenderSeriesMetaRows(start,10);
    if(typeof updateReportTitleAuto==='function')updateReportTitleAuto();
-   status('Padrão confirmado aplicado: obra 1408, moldagem 16/10/2026, FCK 40 MPa, Supermix, vigas de travamento, brita 0 + brita 1 e 10 séries. Serão gerados 40 CPs; confira os dados de BT, nota fiscal e volume por série.');
+   status('Aplicando padrão confirmado: obra 1408, moldagem 16/10/2026, FCK 40 MPa, Supermix, vigas de travamento, brita 0 + brita 1 e 10 séries.');
    document.getElementById('ntec-cp-generate')?.click();
+   const generated=document.querySelectorAll('#ntec-cp-rows tr').length;
+   if(generated===40){
+     document.getElementById('ntec-cp-transfer')?.click();
+   }else{
+     status('O padrão não gerou os 40 CPs esperados (gerados: '+generated+'). Confira as idades, a quantidade por idade e a mensagem anterior; nada foi transferido automaticamente.');
+   }
  });
  document.getElementById('ntec-series-meta-rows')?.addEventListener('input',()=>ntecSyncSeriesMetadataToReport());
  document.getElementById('ntec-cp-generate')?.addEventListener('click',()=>{
