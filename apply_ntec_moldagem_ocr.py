@@ -334,7 +334,7 @@ panel = r"""
    if(typeEl&&[...typeEl.options].some(o=>o.value==='ruptura_concreto')){typeEl.value='ruptura_concreto';typeEl.dispatchEvent(new Event('change',{bubbles:true}));}
    const projectSelect=document.getElementById('reportproject');
    if(projectSelect&&typeof projectsData!=='undefined'){
-     const candidates=projectsData.filter(p=>String(p.work_number||'').replace(/\\D/g,'')==='1408');
+     const candidates=projectsData.filter(p=>String(p.work_number||'').replace(/\D/g,'')==='1408');
      if(candidates.length===1){projectSelect.value=String(candidates[0].id);projectSelect.dispatchEvent(new Event('change',{bubbles:true}));}
    }
    const casting=document.querySelector('[data-report-field="casting_date"]');
