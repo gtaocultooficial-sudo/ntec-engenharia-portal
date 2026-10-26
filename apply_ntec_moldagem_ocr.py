@@ -138,7 +138,7 @@ panel = r"""
        {key:'material',label:'Característica do material',left:.075,right:.37,top:.18,bottom:.25},
        {key:'fck',label:'FCK',left:.065,right:.16,top:.205,bottom:.275},
        {key:'slump',label:'Abatimento teórico',left:.29,right:.42,top:.195,bottom:.255},
-       {key:'application',label:'Local de aplicação',left:.265,right:.515,top:.265,bottom:.66}
+       {key:'application',label:'Local de aplicação',left:.30,right:.515,top:.265,bottom:.66}
      ];
      const cropSuggestions=[];
      for(const f of fieldCrops){
@@ -267,7 +267,8 @@ panel = r"""
  }
  function fillField(el,val){if(!el||!val||el.readOnly||el.disabled)return false;el.value=val;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;}
  applyBtn.addEventListener('click',()=>{
-   const t=textEl.value;if(!t.trim()){status('Faça a leitura ou cole o texto da ficha primeiro.');return;}
+   const t=textEl.value,previewHasData=[...document.querySelectorAll('[data-ocr-field]')].some(el=>String(el.value||'').trim());
+   if(!t.trim()&&!previewHasData){status('Faça a leitura da ficha ou preencha ao menos um campo de conferência antes de aplicar.');return;}
    let filled=0;
    const dateRaw=ocrCandidate('casting_date')||valueAfter(t,['data da moldagem','data de moldagem','data da coleta']);
    const dateMatch=dateRaw.match(/(\d{1,2})[\s\/.,'-](\d{1,2})[\s\/.,'-](\d{2,4})/);
@@ -279,6 +280,8 @@ panel = r"""
      const box=el.closest('.field'),label=box?.querySelector('label')?.textContent||el.dataset.reportField,key=norm(label+' '+el.dataset.reportField);
      let labels=[],directKey='';
      if(/fornecedor|supplier/.test(key)){labels=['fornecedor'];directKey='supplier';}
+     else if(/construtora|empreiteira|contractor/.test(key)){labels=['construtora'];directKey='contractor';}
+     else if(/endereco|address/.test(key)){labels=['endereco','endereço'];directKey='address';}
      else if(/nota fiscal|invoice/.test(key))labels=['nota fiscal','nf'];
      else if(/caminhao|betonada|bt numero/.test(key))labels=['caminhao','bt'];
      else if(/lote|batch/.test(key))labels=['lote','batch'];
@@ -291,7 +294,10 @@ panel = r"""
      if(labels.length){
        let v=(directKey?ocrCandidate(directKey):'')||valueAfter(t,labels);
        if(directKey==='supplier')v=v.replace(/^fornecedor\s*/i,'').trim();
-       if(directKey==='fck'){const m=v.match(/\b\d{1,3}(?:[.,]\d+)?\b/);if(m)v=m[0];}
+       if(directKey==='contractor')v=v.replace(/^construtora\s*/i,'').trim();
+       if(directKey==='address')v=v.replace(/^endereco\s*/i,'').trim();
+       if(directKey==='fck'||directKey==='slump'){const m=v.match(/\b\d{1,3}(?:[.,]\d+)?\b/);if(m)v=m[0];}
+       if(directKey==='application')v=v.replace(/^\s*(?:\d{1,3}\s+){1,3}/,'').trim();
        if(v&&fillField(el,v))filled++;
      }
    }
