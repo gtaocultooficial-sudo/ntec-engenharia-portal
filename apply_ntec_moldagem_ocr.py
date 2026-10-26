@@ -130,15 +130,15 @@ panel = r"""
      const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
      try{for(let i=0;i<pages.length;i++){status('Preparando página '+(i+1)+' de '+pages.length+'…');const variants=makeOcrVariants(pages[i]);let best={score:-1,text:'',angle:0,mode:'6'};for(const variant of variants){for(const mode of ['6','11','12']){status('Lendo página '+(i+1)+' — rotação '+variant.angle+'°, modo '+mode+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const result=await worker.recognize(variant.canvas);const score=ocrScore(result.data.text,result.data.confidence);if(score>best.score)best={score,text:result.data.text,angle:variant.angle,mode,canvas:variant.canvas};}}const fieldCrops=[
-       {label:'Código da obra',left:.485,right:.615,top:.045,bottom:.135},
-       {label:'Data da moldagem',left:.575,right:.765,top:.045,bottom:.135},
-       {label:'Construtora',left:.085,right:.255,top:.135,bottom:.205},
-       {label:'Endereço',left:.285,right:.425,top:.135,bottom:.205},
-       {label:'Fornecedor',left:.405,right:.535,top:.175,bottom:.245},
-       {label:'Característica do material',left:.075,right:.31,top:.16,bottom:.225},
-       {label:'FCK',left:.045,right:.165,top:.195,bottom:.26},
-       {label:'Abatimento teórico',left:.265,right:.405,top:.195,bottom:.26},
-       {label:'Local de aplicação',left:.255,right:.525,top:.34,bottom:.52}
+       {key:'work_code',label:'Código da obra',left:.485,right:.615,top:.045,bottom:.135},
+       {key:'casting_date',label:'Data da moldagem',left:.575,right:.765,top:.045,bottom:.135},
+       {key:'contractor',label:'Construtora',left:.085,right:.255,top:.135,bottom:.205},
+       {key:'address',label:'Endereço',left:.285,right:.425,top:.135,bottom:.205},
+       {key:'supplier',label:'Fornecedor',left:.405,right:.535,top:.175,bottom:.245},
+       {key:'material',label:'Característica do material',left:.075,right:.31,top:.16,bottom:.225},
+       {key:'fck',label:'FCK',left:.045,right:.165,top:.195,bottom:.26},
+       {key:'slump',label:'Abatimento teórico',left:.265,right:.405,top:.195,bottom:.26},
+       {key:'application',label:'Local de aplicação',left:.255,right:.525,top:.34,bottom:.52}
      ];
      const cropSuggestions=[];
      for(const f of fieldCrops){
@@ -155,9 +155,18 @@ panel = r"""
          const sc=ocrScore(txt,rr.data.confidence);
          if(sc>cellBest.score)cellBest={score:sc,text:txt};
        }
-       cropSuggestions.push(f.label+': '+(cellBest.text||'[não reconhecido]'));
+       cropSuggestions.push({key:f.key,label:f.label,text:cellBest.text||''});
      }
-     const regions=[{name:'CABEÇALHO',from:0,to:0.34,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.25,to:0.82,left:0,right:1},{name:'TABELA — METADE ESQUERDA',from:0.25,to:0.82,left:0,right:0.52},{name:'TABELA — METADE DIREITA',from:0.25,to:0.82,left:0.48,right:1},{name:'TABELA — COLUNAS INICIAIS',from:0.30,to:0.80,left:0,right:0.34},{name:'TABELA — COLUNAS CENTRAIS',from:0.30,to:0.80,left:0.28,right:0.70},{name:'TABELA — COLUNAS FINAIS',from:0.30,to:0.80,left:0.64,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.76,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11','12']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\\n'+regionBest.text);}output.push('--- CAMPOS DETECTADOS POR RECORTE (confira) ---\\n'+cropSuggestions.join('\\n')+'\\n\\n--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\\n'+best.text+'\\n\\n'+regionText.join('\\n\\n'));}}
+     const regions=[{name:'CABEÇALHO',from:0,to:0.34,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.25,to:0.82,left:0,right:1},{name:'TABELA — METADE ESQUERDA',from:0.25,to:0.82,left:0,right:0.52},{name:'TABELA — METADE DIREITA',from:0.25,to:0.82,left:0.48,right:1},{name:'TABELA — COLUNAS INICIAIS',from:0.30,to:0.80,left:0,right:0.34},{name:'TABELA — COLUNAS CENTRAIS',from:0.30,to:0.80,left:0.28,right:0.70},{name:'TABELA — COLUNAS FINAIS',from:0.30,to:0.80,left:0.64,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.76,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11','12']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\\n'+regionBest.text);}const preview=document.getElementById('ntec-ocr-fields-preview');
+     if(preview){
+       preview.innerHTML='';
+       for(const field of cropSuggestions){
+         const label=document.createElement('label'),caption=document.createElement('span'),input=document.createElement('input');
+         caption.textContent=field.label;input.type='text';input.value=field.text;input.placeholder='Não reconhecido — confira manualmente';input.dataset.ocrField=field.key;
+         label.appendChild(caption);label.appendChild(input);preview.appendChild(label);
+       }
+     }
+     output.push('--- CAMPOS DETECTADOS POR RECORTE (confira) ---\\n'+cropSuggestions.map(f=>f.label+': '+f.text).join('\\n')+'\\n\\n--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\\n'+best.text+'\\n\\n'+regionText.join('\\n\\n'));}}
      finally{await worker.terminate();}
      textEl.value=output.join('\n\n');status('Leitura concluída. Confira o texto; a escrita manual pode gerar erros. Clique em “Aplicar sugestões” para preencher os campos reconhecidos.');
    }catch(e){const detail=(e&&typeof e.message==='string'&&e.message.trim())?e.message:(typeof e==='string'?e:(e&&e.name?e.name+' (verifique conexão, bloqueio de CDN ou formato do arquivo)':String(e)));status('Falha na leitura automática: '+detail+'. Tente JPG/PNG ou PDF menor que 20 MB; se persistir, envie a mensagem exata para diagnóstico.');console.error('NTEC OCR error:',e);}
@@ -239,6 +248,7 @@ panel = r"""
    status(added+' CP(s) transferido(s) para a tabela do relatório'+(skipped?'; '+skipped+' possível(is) duplicado(s) ignorado(s)':'')+'. Confira as datas, as idades e as cargas antes de salvar.');
  });
  function norm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}
+ function ocrCandidate(key){return String(document.querySelector('[data-ocr-field="'+key+'"]')?.value||'').trim();}
  function valueAfter(text,labels){
    const lines=String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
    // Prefer the separately OCR'd fixed-field crops, which are less likely to mix adjacent columns.
