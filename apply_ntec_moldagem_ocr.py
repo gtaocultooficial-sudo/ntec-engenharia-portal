@@ -67,7 +67,9 @@ panel = r"""
    try{
      status('Carregando leitor de texto…');
      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);
-     const pages=await getPages(file);\n     status('Preparando o reconhecimento em português…');\n     const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
+     const pages=await getPages(file);
+     status('Preparando o reconhecimento em português…');
+     const worker=await Tesseract.createWorker('por+eng',1,{langPath:'https://tessdata.projectnaptha.com/4.0.0',gzip:true,logger:m=>{if(m.status)status('Leitura: '+m.status+(m.progress?' '+Math.round(m.progress*100)+'%':''));}});
      const output=[];
      try{for(let i=0;i<pages.length;i++){status('Lendo página '+(i+1)+' de '+pages.length+'…');const result=await worker.recognize(pages[i]);output.push('--- Página '+(i+1)+' ---\n'+result.data.text);if(typeof ImageBitmap!=='undefined'&&pages[i] instanceof ImageBitmap)pages[i].close?.();}}
      finally{await worker.terminate();}
