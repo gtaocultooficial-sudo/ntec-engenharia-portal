@@ -121,7 +121,8 @@ panel = r"""
  readBtn.addEventListener('click',async()=>{
    const file=fileEl.files&&fileEl.files[0];if(!file){status('Selecione uma foto, imagem ou PDF primeiro.');return;}
    if(file.size>20*1024*1024){status('Arquivo acima de 20 MB. Reduza o arquivo e tente novamente.');return;}
-   readBtn.disabled=true;textEl.value='';
+   readBtn.disabled=true;applyBtn.disabled=true;textEl.value='';
+   const initialPreview=document.getElementById('ntec-ocr-fields-preview');if(initialPreview)initialPreview.innerHTML='<p>Leitura iniciada. Os recortes e campos aparecerão abaixo durante o processamento.</p>';
    try{
      status('Carregando leitor de texto…');
      await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',()=>!!window.Tesseract);
@@ -191,17 +192,29 @@ panel = r"""
        const minimumScore=field.key==='supplier'?14:10;if(best.score<minimumScore)best.text='';
        return best;
      }
-     const cropSuggestions=[];
+     const cropSuggestions=[],previewBox=document.getElementById('ntec-ocr-fields-preview');
+     if(previewBox)previewBox.innerHTML='';
      for(const f of fieldCrops){
+       status('Recortando e lendo campo '+f.label+'…');
        const crop=document.createElement('canvas');
        const x=Math.round(best.canvas.width*f.left),y=Math.round(best.canvas.height*f.top);
        crop.width=Math.max(1,Math.round(best.canvas.width*(f.right-f.left)));
        crop.height=Math.max(1,Math.round(best.canvas.height*(f.bottom-f.top)));
        crop.getContext('2d').drawImage(best.canvas,x,y,crop.width,crop.height,0,0,crop.width,crop.height);
+       const cropImage=crop.toDataURL('image/png');let previewInput=null;
+       if(previewBox){
+         const card=document.createElement('div');card.className='ntec-ocr-field-card';
+         const image=document.createElement('img');image.src=cropImage;image.alt='Recorte da ficha: '+f.label;
+         const label=document.createElement('label'),caption=document.createElement('span');previewInput=document.createElement('input');
+         caption.textContent=f.label;previewInput.type='text';previewInput.placeholder='Lendo…';previewInput.dataset.ocrField=f.key;
+         label.appendChild(caption);label.appendChild(previewInput);card.appendChild(image);card.appendChild(label);previewBox.appendChild(card);
+       }
        let detected='';
        if(f.key==='application'){
          const lines=[{top:.255,bottom:.335},{top:.335,bottom:.405},{top:.405,bottom:.485}],parts=[];
+         let lineNumber=0;
          for(const line of lines){
+           lineNumber++;status('Lendo local de aplicação — linha '+lineNumber+' de 3…');
            const part=document.createElement('canvas'),py=Math.round(best.canvas.height*line.top),ph=Math.max(1,Math.round(best.canvas.height*(line.bottom-line.top)));
            part.width=crop.width;part.height=ph;
            part.getContext('2d').drawImage(best.canvas,x,py,crop.width,ph,0,0,crop.width,ph);
@@ -212,24 +225,14 @@ panel = r"""
        }else{
          const res=await recognizeFieldCrop(crop,f);detected=ocrFieldClean(f.key,res.text);
        }
-       cropSuggestions.push({key:f.key,label:f.label,text:detected,image:crop.toDataURL('image/png')});
+       if(previewInput){previewInput.value=detected;previewInput.placeholder='Não reconhecido — confira manualmente';}
+       cropSuggestions.push({key:f.key,label:f.label,text:detected,image:cropImage});
      }
-     const regions=[{name:'CABEÇALHO',from:0,to:0.27,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.22,to:0.80,left:0,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.75,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\n'+regionBest.text);}const preview=document.getElementById('ntec-ocr-fields-preview');
-     if(preview){
-       preview.innerHTML='';
-       for(const field of cropSuggestions){
-         const card=document.createElement('div');card.className='ntec-ocr-field-card';
-         const label=document.createElement('label'),caption=document.createElement('span'),input=document.createElement('input');
-         caption.textContent=field.label;input.type='text';input.value=field.text;input.placeholder='Não reconhecido — confira manualmente';input.dataset.ocrField=field.key;
-         if(field.image){const img=document.createElement('img');img.src=field.image;img.alt='Recorte da ficha: '+field.label;img.loading='lazy';card.appendChild(img);}
-         label.appendChild(caption);label.appendChild(input);card.appendChild(label);preview.appendChild(card);
-       }
-     }
-     output.push('--- CAMPOS DETECTADOS POR RECORTE (confira) ---\n'+cropSuggestions.map(f=>f.label+': '+f.text).join('\n')+'\n\n--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\n'+best.text+'\n\n'+regionText.join('\n\n'));}}
+     const regions=[{name:'CABEÇALHO',from:0,to:0.27,left:0,right:1},{name:'TABELA DE MOLDAGEM E CPs',from:0.22,to:0.80,left:0,right:1},{name:'RODAPÉ E OBSERVAÇÕES',from:0.75,to:1,left:0,right:1}];const regionText=[];for(const region of regions){const crop=document.createElement('canvas');const sx=Math.round(best.canvas.width*region.left),sw=Math.max(1,Math.round(best.canvas.width*(region.right-region.left)));crop.width=sw;crop.height=Math.max(1,Math.round(best.canvas.height*(region.to-region.from)));crop.getContext('2d').drawImage(best.canvas,sx,Math.round(best.canvas.height*region.from),sw,crop.height,0,0,crop.width,crop.height);let regionBest={score:-1,text:'',mode:'6'};for(const mode of ['6','11']){status('Refinando página '+(i+1)+' — '+region.name+'…');await worker.setParameters({tessedit_pageseg_mode:mode});const rr=await worker.recognize(crop);const digits=(rr.data.text.match(/[0-9]{2,}/g)||[]).length;const sc=ocrScore(rr.data.text,rr.data.confidence)+(region.name.includes('TABELA')?Math.min(digits,30)*0.3:0);if(sc>regionBest.score)regionBest={score:sc,text:rr.data.text,mode};}regionText.push('--- '+region.name+' (modo '+regionBest.mode+') ---\n'+regionBest.text);}     output.push('--- CAMPOS DETECTADOS POR RECORTE (confira) ---\n'+cropSuggestions.map(f=>f.label+': '+f.text).join('\n')+'\n\n--- Página '+(i+1)+' (orientação '+best.angle+'°, modo '+best.mode+') ---\n'+best.text+'\n\n'+regionText.join('\n\n'));}}
      finally{await worker.terminate();}
      textEl.value=output.join('\n\n');status('Leitura concluída. Confira o texto; a escrita manual pode gerar erros. Clique em “Aplicar sugestões” para preencher os campos reconhecidos.');
    }catch(e){const detail=(e&&typeof e.message==='string'&&e.message.trim())?e.message:(typeof e==='string'?e:(e&&e.name?e.name+' (verifique conexão, bloqueio de CDN ou formato do arquivo)':String(e)));status('Falha na leitura automática: '+detail+'. Tente JPG/PNG ou PDF menor que 20 MB; se persistir, envie a mensagem exata para diagnóstico.');console.error('NTEC OCR error:',e);}
-   finally{readBtn.disabled=false;}
+   finally{readBtn.disabled=false;applyBtn.disabled=false;}
  });
  function cpDateFromAge(age){
    const cast=document.querySelector('[data-report-field="casting_date"]')?.value;
