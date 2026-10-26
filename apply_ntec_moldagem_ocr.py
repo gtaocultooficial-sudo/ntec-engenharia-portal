@@ -31,13 +31,18 @@ panel = r"""
   <div class="ntec-cp-table-wrap"><table class="ntec-cp-table"><thead><tr><th>Nº da série de controle</th><th>Identificação do CP</th><th>Idade (dias)</th><th>Data prevista</th><th>Carga real (tf), se ensaiado</th><th></th></tr></thead><tbody id="ntec-cp-rows"></tbody></table></div>
   <h4>Gerar CPs por série</h4>
   <p>Uma linha preenchida da ficha corresponde a uma série. A série de campo é ignorada; o sistema continua a numeração de controle da obra. Ajuste os valores abaixo conforme a ficha antes de gerar.</p>
+  <button type="button" class="btn secondary" id="ntec-cp-use-form02">Preencher padrão confirmado desta ficha (FCK 40 · 10 séries)</button>
   <div class="ntec-series-generator">
-    <label>Linhas de série preenchidas <input id="ntec-cp-series-count" type="number" min="1" max="10" step="1" value="1"></label>
+    <label>Primeira série de controle <input id="ntec-cp-start-series" type="number" min="1" max="99999" step="1" value="1"></label>
+    <label>Linhas de série preenchidas <input id="ntec-cp-series-count" type="number" min="1" max="10" step="1" value="10"></label>
     <label>Idades (dias, separadas por vírgula) <input id="ntec-cp-ages" value="7,28" placeholder="Ex.: 3, 7, 28"></label>
     <label>CPs por idade (na mesma ordem) <input id="ntec-cp-age-counts" value="2,2" placeholder="Ex.: 2, 2, 2"></label>
   </div>
   <button type="button" class="btn secondary" id="ntec-cp-generate">Gerar CPs e séries sequenciais</button>
-  <small>O gerador cria as identificações, as idades e as datas previstas. A carga real fica vazia até o ensaio. Se alguma série tiver quantidades diferentes, revise as linhas geradas antes de transferir.</small>
+  <h4>Dados individuais das 10 séries</h4>
+  <p>Horários, carga/identificação, abatimento, BT, nota fiscal e volume ficam separados por série. Os campos que não puderem ser confirmados pela ficha ficam para conferência, mas não impedem a geração das 10 séries.</p>
+  <div class="ntec-cp-table-wrap"><table class="ntec-cp-table ntec-series-detail-table"><thead><tr><th>Série de controle</th><th>Horário inicial</th><th>Horário de moldagem</th><th>CPs</th><th>Carga / nº carga</th><th>Abatimento (mm)</th><th>Nº série BT</th><th>Nota fiscal</th><th>Volume (m³)</th></tr></thead><tbody id="ntec-series-meta-rows"></tbody></table></div>
+  <small>O gerador cria as identificações, as idades e as datas previstas. A carga real da prensa dos CPs fica vazia até o ensaio. BT, nota fiscal e volume são dados da ficha e podem variar entre séries.</small>
   <small>Não preenchemos automaticamente números manuscritos incertos. Os resultados reais de ruptura devem ser lançados somente após o ensaio.</small>
   <small>O arquivo é processado no navegador e não é enviado a um serviço externo de OCR. É necessária conexão para carregar as bibliotecas de leitura.</small>
 </div>
@@ -50,7 +55,7 @@ panel = r"""
 .ntec-cp-table th,.ntec-cp-table td{border:1px solid #d5dee7;padding:6px;text-align:left;font-size:12px}
 .ntec-cp-table th{background:#eaf0f5}
 .ntec-cp-table input{width:100%;min-width:85px;padding:7px;border:1px solid #cbd6e1;border-radius:5px;box-sizing:border-box}
-.ntec-cp-table input[data-cp-date="1"]{background:#eef5fb}.ntec-series-generator{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:8px;margin:8px 0}.ntec-series-generator label{font-size:12px;font-weight:700;color:#29465f}.ntec-series-generator input{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:8px;border:1px solid #cbd6e1;border-radius:5px}@media(max-width:650px){.ntec-series-generator{grid-template-columns:1fr}}
+.ntec-cp-table input[data-cp-date="1"]{background:#eef5fb}.ntec-series-generator{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:8px;margin:8px 0}.ntec-series-generator label{font-size:12px;font-weight:700;color:#29465f}.ntec-series-generator input{display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:8px;border:1px solid #cbd6e1;border-radius:5px}.ntec-series-detail-table{min-width:1050px}.ntec-series-detail-table input{min-width:80px}.ntec-series-detail-table input[data-series-meta="series"]{min-width:55px;width:64px}@media(max-width:650px){.ntec-series-generator{grid-template-columns:1fr}}
 .ntec-ocr-card p,.ntec-ocr-card small{display:block;color:#526579;font-size:12px;line-height:1.5}
 .ntec-ocr-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .ntec-ocr-card input[type=file]{max-width:100%;padding:8px}
