@@ -149,14 +149,15 @@ panel = r"""
    const def=matrixDefinition('primary');if(!def?.columns?.length){status('Não foi possível identificar as colunas do relatório.');return;}
    const normHeader=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
    const idx=terms=>def.columns.findIndex(col=>terms.some(t=>normHeader(col).includes(t)));
-   const ix={id:idx(['cp nº','cp n°','cp','amostra']),series:idx(['série','serie','nº série','numero da serie']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
+   const ix={id:idx(['identificação do cp','identificacao do cp','cp nº','cp n°','cp','amostra']),series:idx(['nº série','numero da serie','série da moldagem','serie da moldagem']),age:idx(['idade']),date:idx(['data de ruptura','ruptura']),load:idx(['carga (tf)','carga de ruptura'])};
    if(ix.id<0||ix.age<0||ix.date<0||ix.load<0){status('As colunas de CP, idade, data de ruptura e carga (tf) não foram encontradas na tabela do relatório. Nada foi transferido.');return;}
+   if(ix.series===ix.id)ix.series=-1;
    const existing=[...document.querySelectorAll('tbody[data-report-matrix-rows="primary"] tr')].map(tr=>({id:String(tr.querySelector('[data-matrix-cell="'+ix.id+'"]')?.value||'').trim().toLowerCase(),age:String(tr.querySelector('[data-matrix-cell="'+ix.age+'"]')?.value||'').trim().toLowerCase()}));
    let added=0,skipped=0;
    valid.forEach(r=>{
      const id=String(r.id||'').trim().toLowerCase(),age=String(r.age||'').trim().toLowerCase();
      if((id||age)&&existing.some(x=>(id&&x.id===id)&&(!age||!x.age||x.age===age))){skipped++;return;}
-     const vals=Array(def.columns.length).fill('');vals[ix.id]=r.id;if(ix.series>=0)vals[ix.series]=r.series;else if(r.series&&r.id)vals[ix.id]=r.series+' / '+r.id;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age});
+     const vals=Array(def.columns.length).fill('');vals[ix.id]=(ix.series<0&&r.series&&r.id)?r.series+' / '+r.id:r.id;if(ix.series>=0)vals[ix.series]=r.series;vals[ix.age]=r.age;vals[ix.date]=r.date;vals[ix.load]=r.load;addReportMatrixRow('primary',vals);added++;existing.push({id,age});
    });
    status(added+' CP(s) transferido(s) para a tabela do relatório'+(skipped?'; '+skipped+' possível(is) duplicado(s) ignorado(s)':'')+'. Confira as datas, as idades e as cargas antes de salvar.');
  });
