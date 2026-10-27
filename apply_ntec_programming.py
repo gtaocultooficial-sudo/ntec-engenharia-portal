@@ -18,18 +18,69 @@ api_methods = r"""async loadProgrammingData(){
  if(!currentSession)throw new Error('Faça login para acessar a programação.');
  if(currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário para a programação.');
  const [itemsResult,projectsResult,proposalsResult,reportsResult]=await Promise.all([
-  supabase.from('programming_items').select('id,project_id,proposal_id,report_id,parent_item_id,item_type,title,description,scheduled_date,scheduled_time,duration_minutes,sample_series,test_age_days,quantity,unit,status,notes,created_at,updated_at,projects(name,work_number,client_id,clients(company_name)),proposals(proposal_number,status,description),reports(report_number,title,report_type,status)').order('scheduled_date',{ascending:true}).order('scheduled_time',{ascending:true}),
+  supabase.from('programming_items').select('id,project_id,proposal_id,report_id,parent_item_id,item_type,title,description,scheduled_date,scheduled_end_date,scheduled_time,duration_minutes,sample_series,test_age_days,quantity,unit,status,notes,created_at,updated_at,projects(name,work_number,client_id,clients(company_name)),proposals(proposal_number,status,description,service_mode,staff_count),reports(report_number,title,report_type,status)').order('scheduled_date',{ascending:true}).order('scheduled_time',{ascending:true}),
   supabase.from('projects').select('id,name,client_id,work_number,status,created_at,clients(company_name)').order('created_at',{ascending:false}),
-  supabase.from('proposals').select('id,proposal_number,client_id,project_id,description,amount,status,valid_until,created_at,clients(company_name)').eq('status','aprovada').order('created_at',{ascending:false}),
+  supabase.from('proposals').select('id,proposal_number,client_id,project_id,description,amount,status,valid_until,service_mode,staff_count,service_start_date,service_end_date,work_weekdays,programming_generated_at,created_at,clients(company_name)').order('created_at',{ascending:false}),
   supabase.from('reports').select('id,project_id,report_number,title,report_type,report_date,status').order('report_date',{ascending:false})
  ]);
  for(const result of [itemsResult,projectsResult,proposalsResult,reportsResult])if(result.error)throw result.error;
  return {items:itemsResult.data||[],projects:projectsResult.data||[],proposals:proposalsResult.data||[],reports:reportsResult.data||[]};
 },
+async approveProposalAndSchedule(payload){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ if(!payload?.proposal_id)throw new Error('Selecione uma proposta.');
+ if(!['mensal','diaria','pontual'].includes(payload.service_mode))throw new Error('Confirme se o atendimento é mensal, por diária ou pontual.');
+ if(!payload.project_id||!payload.service_start_date||!payload.service_end_date)throw new Error('Selecione a obra e o período de início e fim.');
+ if(payload.service_end_date<payload.service_start_date)throw new Error('A data final não pode ser anterior à data inicial.');
+ const {data:proposal,error:readError}=await supabase.from('proposals').select('id,proposal_number,client_id,project_id,description,status,programming_generated_at').eq('id',payload.proposal_id).single();
+ if(readError)throw readError;
+ if(proposal.programming_generated_at)throw new Error('Esta proposta já gerou programação. Atualize a lista para conferir as atividades existentes.');
+ const start=new Date(payload.service_start_date+'T12:00:00'),end=new Date(payload.service_end_date+'T12:00:00');
+ const staff=Math.max(1,Math.min(100,Math.floor(Number(payload.staff_count||1))));
+ const weekdays=(Array.isArray(payload.work_weekdays)?payload.work_weekdays:[]).map(Number).filter(n=>n>=1&&n<=7);
+ if(payload.service_mode==='diaria'&&!weekdays.length)throw new Error('Selecione pelo menos um dia da semana para as diárias.');
+ const baseTitle=payload.service_mode==='mensal'?'Funcionário mensal':payload.service_mode==='diaria'?'Funcionário por diária':'Atendimento pontual';
+ const description=String(proposal.description||'').trim();
+ const rows=[];
+ const makeRow=(date,endDate,key,title,quantity,unit,notes)=>({
+  project_id:payload.project_id,proposal_id:proposal.id,item_type:'programacao_obra',title,description,
+  scheduled_date:date,scheduled_end_date:endDate,scheduled_time:null,duration_minutes:null,sample_series:null,test_age_days:null,
+  quantity,unit,status:'agendado',notes,schedule_key:key,created_by:currentSession.user.id,updated_at:new Date().toISOString()
+ });
+ if(payload.service_mode==='mensal'){
+  let cursor=new Date(start.getFullYear(),start.getMonth(),1,12);
+  while(cursor<=end){
+   const monthStart=new Date(cursor.getFullYear(),cursor.getMonth(),1,12);
+   const monthEnd=new Date(cursor.getFullYear(),cursor.getMonth()+1,0,12);
+   const a=monthStart<start?start:monthStart,b=monthEnd>end?end:monthEnd;
+   const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+   const key=proposal.id+':mensal:'+iso(a)+':'+iso(b);
+   rows.push(makeRow(iso(a),iso(b),key,baseTitle+' — '+(proposal.proposal_number||'Proposta'),staff,'funcionário/mês','Período de atendimento mensal gerado a partir da proposta '+(proposal.proposal_number||proposal.id)+'. Revise escala e horários antes de iniciar. Escopo: '+description));
+   cursor=new Date(cursor.getFullYear(),cursor.getMonth()+1,1,12);
+  }
+ }else{
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+   if(payload.service_mode==='diaria'&&!weekdays.includes(d.getDay()===0?7:d.getDay()))continue;
+   const date=iso(d),key=proposal.id+':'+payload.service_mode+':'+date;
+   rows.push(makeRow(date,date,key,baseTitle+' — '+(proposal.proposal_number||'Proposta'),staff,payload.service_mode==='diaria'?'funcionário/diária':'atendimento','Atividade criada a partir da proposta '+(proposal.proposal_number||proposal.id)+'. É uma programação prevista, não um registro de serviço executado. Escopo: '+description));
+  }
+ }
+ if(!rows.length)throw new Error('Nenhuma atividade foi gerada. Revise período e dias selecionados.');
+ const {error:rowsError}=await supabase.from('programming_items').upsert(rows,{onConflict:'schedule_key',ignoreDuplicates:true});
+ if(rowsError)throw rowsError;
+ const {data:updated,error:updateError}=await supabase.from('proposals').update({
+  project_id:payload.project_id,status:'aprovada',service_mode:payload.service_mode,staff_count:staff,
+  service_start_date:payload.service_start_date,service_end_date:payload.service_end_date,
+  work_weekdays:weekdays,programming_generated_at:new Date().toISOString()
+ }).eq('id',proposal.id).select('id,proposal_number,status,programming_generated_at').single();
+ if(updateError)throw updateError;
+ return {proposal:updated,scheduledCount:rows.length,mode:payload.service_mode};
+},
 async saveProgrammingItem(payload){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
  if(!payload?.project_id||!payload?.scheduled_date||!String(payload?.title||'').trim())throw new Error('Informe a obra, o título e a data programada.');
- const row={project_id:payload.project_id,proposal_id:payload.proposal_id||null,report_id:payload.report_id||null,parent_item_id:payload.parent_item_id||null,item_type:payload.item_type||'outro',title:String(payload.title).trim(),description:String(payload.description||''),scheduled_date:payload.scheduled_date,scheduled_time:payload.scheduled_time||null,duration_minutes:payload.duration_minutes==null||payload.duration_minutes===''?null:Number(payload.duration_minutes),sample_series:payload.sample_series==null||payload.sample_series===''?null:Number(payload.sample_series),test_age_days:payload.test_age_days==null||payload.test_age_days===''?null:Number(payload.test_age_days),quantity:payload.quantity==null||payload.quantity===''?null:Number(payload.quantity),unit:String(payload.unit||''),status:payload.status||'planejado',notes:String(payload.notes||''),updated_at:new Date().toISOString()};
+ const row={project_id:payload.project_id,proposal_id:payload.proposal_id||null,report_id:payload.report_id||null,parent_item_id:payload.parent_item_id||null,schedule_key:payload.schedule_key||null,item_type:payload.item_type||'outro',title:String(payload.title).trim(),description:String(payload.description||''),scheduled_date:payload.scheduled_date,scheduled_end_date:payload.scheduled_end_date||null,scheduled_time:payload.scheduled_time||null,duration_minutes:payload.duration_minutes==null||payload.duration_minutes===''?null:Number(payload.duration_minutes),sample_series:payload.sample_series==null||payload.sample_series===''?null:Number(payload.sample_series),test_age_days:payload.test_age_days==null||payload.test_age_days===''?null:Number(payload.test_age_days),quantity:payload.quantity==null||payload.quantity===''?null:Number(payload.quantity),unit:String(payload.unit||''),status:payload.status||'planejado',notes:String(payload.notes||''),updated_at:new Date().toISOString()};
  let result;
  if(payload.id)result=await supabase.from('programming_items').update(row).eq('id',payload.id).select('id').single();
  else result=await supabase.from('programming_items').insert({...row,created_by:currentSession.user.id}).select('id').single();
@@ -129,7 +180,7 @@ runtime = r'''<script>
  function setBusy(value){busy=value;const btn=$('ntec-pg-save');if(btn){btn.disabled=value;btn.textContent=value?'Salvando…':($('ntec-pg-id').value?'Atualizar atividade':'Salvar atividade')}}
  function approvedProposalsForProject(projectId){
   const p=data.projects.find(x=>String(x.id)===String(projectId));if(!p)return [];
-  return data.proposals.filter(x=>String(x.project_id||'')===String(projectId)||(!x.project_id&&String(x.client_id)===String(p.client_id)));
+  return data.proposals.filter(x=>x.status==='aprovada'&&(String(x.project_id||'')===String(projectId)||(!x.project_id&&String(x.client_id)===String(p.client_id))));
  }
  function refreshLinkedOptions(keepProposal='',keepReport=''){
   const projectId=$('ntec-pg-project').value;
