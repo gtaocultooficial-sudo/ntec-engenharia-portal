@@ -259,8 +259,13 @@ runtime = r'''<script>
   }
   body.querySelectorAll('td[colspan]').forEach(td=>{td.colSpan=header.querySelectorAll('th').length});
  }
- function openProposalReviewFromExisting(id){
-  if(typeof showPage==='function')showPage('programacao');
+ async function openProposalReviewFromExisting(id){
+  // Load the authoritative proposal/project rows before trying to populate the
+  // review form. The proposal list can be opened before Programação was loaded.
+  await loadData(true);
+  const nav=document.querySelector('#nav [data-page="programacao"]');
+  if(nav)nav.click();
+  else document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden',el.id!=='page-programacao'));
   openProposalReview(id);
  }
  function localToday(){
