@@ -116,6 +116,32 @@ once(nav_anchor, nav_new, "navegação da programação")
 
 section = r'''<section class="page hidden" id="page-programacao">
  <div class="titleline"><div><h1>Programação de atividades</h1><p>Organize visitas, moldagens, rupturas, ensaios e entregas por obra, usando propostas aprovadas como referência.</p></div><button class="btn primary" id="ntec-pg-new" type="button">+ Nova atividade</button></div>
+ <div class="panel" id="ntec-pg-proposal-queue">
+  <h2>Propostas aguardando fechamento e programação</h2>
+  <p class="sub">Ao analisar uma proposta, o sistema procura indícios de atendimento mensal ou por diária no texto do escopo. Confirme a classificação, o período, a quantidade de funcionários e os dias de trabalho antes de aprovar.</p>
+  <div class="tablewrap"><table class="ntec-pg-table"><thead><tr><th>Proposta / cliente</th><th>Escopo</th><th>Leitura inicial</th><th>Status</th><th>Ação</th></tr></thead><tbody id="ntec-pg-proposal-queue-body"><tr><td colspan="5" class="empty">Carregando propostas…</td></tr></tbody></table></div>
+ </div>
+ <div class="panel hidden" id="ntec-pg-proposal-review">
+  <h2>Analisar proposta e montar programação</h2>
+  <input id="ntec-pg-review-proposal-id" type="hidden"/>
+  <div class="ntec-pg-proposal-summary" id="ntec-pg-review-summary"></div>
+  <div class="formgrid">
+   <div class="field"><label for="ntec-pg-review-project">Obra para programar *</label><select id="ntec-pg-review-project" required><option value="">Selecione a obra</option></select></div>
+   <div class="field"><label for="ntec-pg-review-mode">Modelo de atendimento identificado *</label><select id="ntec-pg-review-mode"><option value="revisar">Não identificado — revisar</option><option value="mensal">Funcionário mensal</option><option value="diaria">Funcionário por diária</option><option value="pontual">Serviço pontual</option></select><small class="muted small">A classificação é uma sugestão baseada no texto, não uma decisão automática definitiva.</small></div>
+   <div class="field"><label for="ntec-pg-review-staff">Quantidade de funcionários *</label><input id="ntec-pg-review-staff" type="number" min="1" max="100" step="1" value="1" required/></div>
+   <div class="field"><label for="ntec-pg-review-start">Início do atendimento *</label><input id="ntec-pg-review-start" type="date" required/></div>
+   <div class="field"><label for="ntec-pg-review-end">Fim do atendimento *</label><input id="ntec-pg-review-end" type="date" required/></div>
+  </div>
+  <div class="field" id="ntec-pg-review-weekdays">
+   <label>Dias da semana para as diárias *</label>
+   <div class="ntec-pg-weekdays">
+    <label><input type="checkbox" value="1" data-pg-weekday checked/> Seg</label><label><input type="checkbox" value="2" data-pg-weekday checked/> Ter</label><label><input type="checkbox" value="3" data-pg-weekday checked/> Qua</label><label><input type="checkbox" value="4" data-pg-weekday checked/> Qui</label><label><input type="checkbox" value="5" data-pg-weekday checked/> Sex</label><label><input type="checkbox" value="6" data-pg-weekday/> Sáb</label><label><input type="checkbox" value="7" data-pg-weekday/> Dom</label>
+   </div>
+   <small class="muted small">De segunda a sexta vêm marcados como sugestão; ajuste conforme a proposta.</small>
+  </div>
+  <div class="ntec-pg-schedule-preview" id="ntec-pg-review-preview">Preencha o modelo e o período para conferir como a programação será criada.</div>
+  <div class="ntec-pg-actions"><button class="btn primary" id="ntec-pg-review-approve" type="button">Aprovar proposta e gerar programação</button><button class="btn" id="ntec-pg-review-cancel" type="button">Cancelar</button><span id="ntec-pg-review-message" role="status" aria-live="polite"></span></div>
+ </div>
  <div class="cards ntec-pg-metrics">
   <div class="metric"><div class="metric-top"><span>Planejadas / agendadas</span><span class="metric-icon">▦</span></div><strong id="ntec-pg-count-planned">0</strong><small>Atividades futuras ou organizadas</small></div>
   <div class="metric"><div class="metric-top"><span>Em andamento</span><span class="metric-icon">◷</span></div><strong id="ntec-pg-count-active">0</strong><small>Em execução ou aguardando resultado</small></div>
@@ -148,7 +174,7 @@ section = r'''<section class="page hidden" id="page-programacao">
   <div class="ntec-pg-actions"><button class="btn primary" id="ntec-pg-save" type="button">Salvar atividade</button><button class="btn" id="ntec-pg-cancel" type="button">Cancelar</button><span id="ntec-pg-message" role="status" aria-live="polite"></span></div>
  </div>
  <div class="toolbar ntec-pg-toolbar"><input id="ntec-pg-search" class="btn" placeholder="Buscar obra, atividade ou proposta…"/><select id="ntec-pg-filter" aria-label="Filtrar por status"><option value="">Todos os status</option><option value="planejado">Planejado</option><option value="agendado">Agendado</option><option value="em_andamento">Em andamento</option><option value="aguardando_resultado">Aguardando resultado</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option></select><button class="btn" id="ntec-pg-refresh" type="button">Atualizar</button></div>
- <div class="tablewrap"><table class="ntec-pg-table"><thead><tr><th>Data / horário</th><th>Atividade / obra</th><th>Proposta / relatório</th><th>Série / idade</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ntec-pg-body"><tr><td colspan="6" class="empty">Abra Programação para carregar as atividades.</td></tr></tbody></table></div>
+ <div class="tablewrap"><table class="ntec-pg-table"><thead><tr><th>Data / período</th><th>Atividade / obra</th><th>Proposta / relatório</th><th>Série / idade</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ntec-pg-body"><tr><td colspan="6" class="empty">Abra Programação para carregar as atividades.</td></tr></tbody></table></div>
  <p class="footnote">A programação registra previsões. A data prevista de ruptura não comprova que o ensaio foi executado; leituras de prensa e resultados reais continuam sendo lançados no módulo de ensaios.</p>
 </section>
 '''
@@ -159,7 +185,7 @@ if len(_medicoes) != 1:
 s = s.replace(_medicoes[0], section + "\n" + _medicoes[0], 1)
 
 css = r'''
-.ntec-pg-molding-options{margin:10px 0;padding:12px;background:#f4f7fa;border:1px solid var(--line);border-radius:9px}.ntec-pg-auto-label{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}.ntec-pg-auto-label input{width:auto}.ntec-pg-molding-options .field{margin:10px 0 0;max-width:260px}.ntec-pg-metrics{margin:12px 0 18px}.ntec-pg-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ntec-pg-toolbar input{flex:1;min-width:200px}.ntec-pg-toolbar select{min-height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;color:var(--ink)}.ntec-pg-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px}.ntec-pg-actions [role=status]{font-size:12px;color:var(--muted)}.ntec-pg-table td{vertical-align:top}.ntec-pg-sub{display:block;color:var(--muted);font-size:12px;margin-top:4px}.ntec-pg-tag{display:inline-block;border-radius:999px;background:#edf2f7;color:#334155;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap}.ntec-pg-tag.overdue{background:#fff1f0;color:#9b1c1c}.ntec-pg-tag.done{background:#e9f7ef;color:#166534}.ntec-pg-buttons{display:flex;gap:5px;flex-wrap:wrap}.ntec-pg-buttons .btn{padding:6px 8px;font-size:11px}.ntec-pg-empty{padding:22px;text-align:center;color:var(--muted)}@media(max-width:700px){.ntec-pg-toolbar>*{width:100%;min-width:0}.ntec-pg-actions #ntec-pg-message{width:100%}}
+.ntec-pg-proposal-summary,.ntec-pg-schedule-preview{padding:12px;background:#f4f7fa;border:1px solid var(--line);border-radius:9px;margin:10px 0 14px;line-height:1.5;font-size:13px}.ntec-pg-weekdays{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0}.ntec-pg-weekdays label{display:flex;align-items:center;gap:5px}.ntec-pg-weekdays input{width:auto}.ntec-pg-molding-options{margin:10px 0;padding:12px;background:#f4f7fa;border:1px solid var(--line);border-radius:9px}.ntec-pg-auto-label{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}.ntec-pg-auto-label input{width:auto}.ntec-pg-molding-options .field{margin:10px 0 0;max-width:260px}.ntec-pg-metrics{margin:12px 0 18px}.ntec-pg-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ntec-pg-toolbar input{flex:1;min-width:200px}.ntec-pg-toolbar select{min-height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;color:var(--ink)}.ntec-pg-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px}.ntec-pg-actions [role=status]{font-size:12px;color:var(--muted)}.ntec-pg-table td{vertical-align:top}.ntec-pg-sub{display:block;color:var(--muted);font-size:12px;margin-top:4px}.ntec-pg-tag{display:inline-block;border-radius:999px;background:#edf2f7;color:#334155;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap}.ntec-pg-tag.overdue{background:#fff1f0;color:#9b1c1c}.ntec-pg-tag.done{background:#e9f7ef;color:#166534}.ntec-pg-buttons{display:flex;gap:5px;flex-wrap:wrap}.ntec-pg-buttons .btn{padding:6px 8px;font-size:11px}.ntec-pg-empty{padding:22px;text-align:center;color:var(--muted)}@media(max-width:700px){.ntec-pg-toolbar>*{width:100%;min-width:0}.ntec-pg-actions #ntec-pg-message{width:100%}}
 '''
 if '</style>' not in s:
     raise SystemExit("estilos da programação: tag style não encontrada")
