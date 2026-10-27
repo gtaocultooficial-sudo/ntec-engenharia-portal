@@ -312,14 +312,14 @@ function ntecNormalizeReportStatus(value){
 function ntecReportIsCompleted(report){
  const candidates=[report?.status,report?.statusLabel,report?.status_label,report?.statusText,report?.status_text];
  const statuses=candidates.map(ntecNormalizeReportStatus).filter(Boolean);
- return statuses.some(status=>/^(emitido|emitida|concluido|concluida|finalizado|finalizada|aprovado|aprovada|issued|completed|complete|final)$/.test(status));
+ return statuses.some(status=>/(^|_)(emitido|emitida|concluido|concluida|finalizado|finalizada|aprovado|aprovada|issued|completed|complete|final)(_|$)/.test(status));
 }
 function ntecEnsureReportSections(){
  if(!window.ntecReportsView)window.ntecReportsView='active';
- const controls=[...document.querySelectorAll('button,a,[role="tab"],[data-tab]')].filter(el=>!el.closest('#reportsbody'));
+ const controls=[...document.querySelectorAll('button,a,[role="tab"],[data-tab],.tab,.tab-btn,.tab-button,.nav-link,.section-tab')].filter(el=>!el.closest('#reportsbody'));
  for(const el of controls){
   if(el.dataset.ntecReportViewBound==='1')continue;
-  const label=ntecNormalizeReportStatus(el.textContent);
+  const label=ntecNormalizeReportStatus(el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')||el.dataset.tab||'');
   let view='';
   if(label.includes('em_andamento'))view='active';
   else if(label.includes('concluido')||label.includes('concluida')||label.includes('emitido')||label.includes('emitida'))view='completed';
