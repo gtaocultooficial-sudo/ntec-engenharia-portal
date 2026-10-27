@@ -116,11 +116,15 @@ async loadProposalIntake(){
  const [requestsResult,projectsResult,proposalsResult]=await Promise.all([
   supabase.from('proposal_requests').select('id,full_name,company_name,email,phone,service,project_location,details,consent_to_contact,status,created_at').order('created_at',{ascending:false}),
   supabase.from('projects').select('id,name,client_id,work_number,status,clients(company_name)').order('created_at',{ascending:false}),
-  supabase.from('proposals').select('id,proposal_number,source_request_id,status,amount,valid_until,description,created_at,client_id,project_id,service_mode,staff_count,clients(company_name,contact_name,email,phone),projects(name,address,work_number,clients(company_name))').order('created_at',{ascending:false})
+  supabase.from('proposals').select('id,proposal_number,source_request_id,status,amount,valid_until,description,created_at,client_id,project_id,service_mode,staff_count,clients(company_name,contact_name,email,phone),projects(name,address,work_number,clients(company_name))').order('created_at',{ascending:false}),
+  supabase.from('proposal_items').select('id,proposal_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total').order('item_number',{ascending:true})
  ]);
- for(const result of [requestsResult,projectsResult,proposalsResult])if(result.error)throw result.error;
+ for(const result of [requestsResult,projectsResult,proposalsResult,itemsResult])if(result.error)throw result.error;
  const linked=proposalsResult.data||[];
- return {requests:(requestsResult.data||[]).map(r=>({...r,linked_proposal:linked.find(p=>p.source_request_id===r.id)||null})),projects:projectsResult.data||[],proposals:linked};
+ const groupedItems=new Map();
+ for(const item of (itemsResult.data||[])){if(!groupedItems.has(item.proposal_id))groupedItems.set(item.proposal_id,[]);groupedItems.get(item.proposal_id).push(item);}
+ const proposals=linked.map(p=>({...p,items:groupedItems.get(p.id)||[]}));
+ return {requests:(requestsResult.data||[]).map(r=>({...r,linked_proposal:proposals.find(p=>p.source_request_id===r.id)||null})),projects:projectsResult.data||[],proposals};
 },
 async updateProposalRequestStatus(id,status){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
@@ -134,9 +138,23 @@ async createDraftProposalFromRequest(payload){
  if(!payload?.request_id)throw new Error('Selecione uma solicitação original.');
  if(!String(payload.service||'').trim())throw new Error('Informe o serviço da proposta.');
  if(!String(payload.description||'').trim())throw new Error('Revise e preencha o escopo proposto.');
- const amount=Number(payload.amount);
- if(!Number.isFinite(amount)||amount<=0)throw new Error('Informe um valor maior que zero para a proposta.');
  if(payload.service_mode&&!['mensal','diaria','pontual','revisar'].includes(payload.service_mode))throw new Error('Modelo de cobrança inválido.');
+ const inputItems=Array.isArray(payload.items)?payload.items:[];
+ if(!inputItems.length)throw new Error('Adicione pelo menos um item na composição de preços.');
+ const normalizedItems=inputItems.map((item,index)=>{
+  const description=String(item.description||'').trim(),unit=String(item.unit||'serviço').trim();
+  const quantity=Number(item.quantity),unit_price=Number(item.unit_price),discount_percent=Number(item.discount_percent||0);
+  if(!description)throw new Error('Informe a descrição do item '+(index+1)+'.');
+  if(!unit||unit.length>40)throw new Error('Informe uma unidade válida no item '+(index+1)+'.');
+  if(!Number.isFinite(quantity)||quantity<=0)throw new Error('A quantidade do item '+(index+1)+' deve ser maior que zero.');
+  if(!Number.isFinite(unit_price)||unit_price<0)throw new Error('O preço unitário do item '+(index+1)+' não pode ser negativo.');
+  if(!Number.isFinite(discount_percent)||discount_percent<0||discount_percent>100)throw new Error('O desconto do item '+(index+1)+' deve ficar entre 0% e 100%.');
+  const gross=Math.round(quantity*unit_price*100)/100;
+  const line_total=Math.round(gross*(1-discount_percent/100)*100)/100;
+  return {item_number:index+1,description,quantity,unit,unit_price,discount_percent,line_total};
+ });
+ const amount=Math.round(normalizedItems.reduce((sum,item)=>sum+item.line_total,0)*100)/100;
+ if(!Number.isFinite(amount)||amount<=0)throw new Error('O total da proposta precisa ser maior que zero. Confira os valores dos itens.');
  const {data:request,error:requestError}=await supabase.from('proposal_requests').select('id,full_name,company_name,email,phone,service,project_location,details,status').eq('id',payload.request_id).single();
  if(requestError)throw requestError;
  const {data:prior,error:priorError}=await supabase.from('proposals').select('id,proposal_number,status').eq('source_request_id',request.id).limit(1);
@@ -165,8 +183,17 @@ async createDraftProposalFromRequest(payload){
  proposalPayload.description=String(payload.service).trim()+String.fromCharCode(10,10)+String(payload.description).trim();
  const createdProposal=await supabase.from('proposals').insert(proposalPayload).select('id,proposal_number,status,amount,source_request_id,client_id,project_id,description,valid_until,service_mode,staff_count,created_at').single();
  if(createdProposal.error)throw createdProposal.error;
+ const itemsToSave=normalizedItems.map(item=>({...item,proposal_id:createdProposal.data.id}));
+ const savedItems=await supabase.from('proposal_items').insert(itemsToSave).select('id,proposal_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total');
+ if(savedItems.error){
+  await supabase.from('proposals').delete().eq('id',createdProposal.data.id);
+  throw new Error('Não foi possível salvar a composição de preços; a proposta não foi mantida: '+savedItems.error.message);
+ }
+ const totalUpdate=await supabase.from('proposals').update({amount}).eq('id',createdProposal.data.id);
+ if(totalUpdate.error)throw new Error('Itens salvos, mas não foi possível atualizar o total da proposta: '+totalUpdate.error.message);
  const statusUpdate=await supabase.from('proposal_requests').update({status:'proposta_criada'}).eq('id',request.id);
- return {proposal:createdProposal.data,requestStatusUpdated:!statusUpdate.error,warning:statusUpdate.error?.message||null};
+ const proposal={...createdProposal.data,amount,items:savedItems.data||[]};
+ return {proposal,requestStatusUpdated:!statusUpdate.error,warning:statusUpdate.error?.message||null};
 },
 getProgrammingAccess(){return Boolean(currentSession&&currentProfile?.role==='admin');},
 """
