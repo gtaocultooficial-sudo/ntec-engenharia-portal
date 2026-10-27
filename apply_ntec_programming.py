@@ -147,7 +147,6 @@ runtime = r'''<script>
   $('ntec-pg-body').querySelectorAll('[data-pg-delete]').forEach(button=>button.addEventListener('click',()=>deleteItem(button.dataset.pgDelete)));
  }
  async function loadData(force=false){
-  if(busy)return;
   if(loaded&&!force){renderTable();return}
   message('Carregando dados da programação…');
   try{
@@ -236,17 +235,6 @@ _closing = re.search(r'</body>\s*</html>\s*$', s, flags=re.I)
 if not _closing:
     raise SystemExit("script do módulo de programação: final do documento não encontrado")
 s = s[:_closing.start()] + runtime + "\n" + s[_closing.start():]
-
-for token in ["page-programacao","ntec-pg-body","loadProgrammingData","saveProgrammingItem","data-page=\"programacao\""]:
-    if token not in s:
-        raise SystemExit("Validação do módulo de programação falhou: " + token)
-
-path.write_text(s, encoding="utf-8")
-print("Applied NTEC programming module to", path)
-, s, flags=re.I)
-if not _closing:
-    raise SystemExit("script do módulo de programação: final do documento não encontrado")
-s = s[:_closing.start()] + runtime + "\\n" + s[_closing.start():]
 
 for token in ["page-programacao","ntec-pg-body","loadProgrammingData","saveProgrammingItem","data-page=\"programacao\""]:
     if token not in s:
