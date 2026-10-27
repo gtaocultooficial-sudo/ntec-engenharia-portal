@@ -5,6 +5,8 @@ create table public.programming_items (
   project_id uuid not null references public.projects(id),
   proposal_id uuid null references public.proposals(id) on delete set null,
   report_id uuid null references public.reports(id) on delete set null,
+  scheduled_end_date date null,
+  schedule_key text null,
   parent_item_id uuid null references public.programming_items(id) on delete set null,
   item_type text not null default 'outro'
     check (item_type = any (array[
@@ -42,6 +44,8 @@ create index programming_items_report_idx
   on public.programming_items (report_id);
 create index programming_items_parent_item_idx
   on public.programming_items (parent_item_id);
+create unique index programming_items_schedule_key_uidx
+  on public.programming_items (schedule_key);
 create index programming_items_status_date_idx
   on public.programming_items (status, scheduled_date);
 
