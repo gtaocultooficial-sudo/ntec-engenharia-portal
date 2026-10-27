@@ -208,6 +208,100 @@ runtime = r'''<script>
   const p=data.projects.find(x=>String(x.id)===String(projectId));if(!p)return [];
   return data.proposals.filter(x=>x.status==='aprovada'&&(String(x.project_id||'')===String(projectId)||(!x.project_id&&String(x.client_id)===String(p.client_id))));
  }
+ function normalizeProposalText(value){return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')}
+ function inferProposalMode(proposal){
+  if(['mensal','diaria','pontual'].includes(proposal?.service_mode))return proposal.service_mode;
+  const text=normalizeProposalText((proposal?.description||'')+' '+(proposal?.service_mode||''));
+  const monthly=/(mensal|mensalista|funcionario fixo|por mes|por m[eê]s)/.test(text);
+  const daily=/(diaria|diario|diarista|por dia|por diaria|por dia trabalhado)/.test(text);
+  if(monthly&&!daily)return 'mensal';
+  if(daily&&!monthly)return 'diaria';
+  return 'revisar';
+ }
+ const serviceModeLabel={mensal:'Funcionário mensal',diaria:'Funcionário por diária',pontual:'Serviço pontual',revisar:'Revisar escopo'};
+ function renderProposalQueue(){
+  const body=$('ntec-pg-proposal-queue-body');if(!body)return;
+  const queue=(data.proposals||[]).filter(p=>!['recusada','expirada'].includes(p.status)&&!p.programming_generated_at);
+  body.innerHTML=queue.length?queue.map(p=>{
+   const mode=inferProposalMode(p),status=p.status==='aprovada'?'Aprovada':p.status==='enviada'?'Enviada':'Rascunho';
+   const project=p.project_id?data.projects.find(x=>String(x.id)===String(p.project_id)):null;
+   const client=p.clients?.company_name||project?.clients?.company_name||'Cliente';
+   const action=p.status==='aprovada'?'Gerar programação':'Analisar e fechar';
+   return '<tr><td><strong>'+esc(p.proposal_number||'Proposta sem número')+'</strong><span class="ntec-pg-sub">'+esc(client)+'</span>'+(project?'<span class="ntec-pg-sub">'+esc(project.name)+'</span>':'<span class="ntec-pg-sub">Obra ainda não vinculada</span>')+'</td><td>'+esc(p.description||'Escopo não informado')+'</td><td><span class="ntec-pg-tag">'+esc(serviceModeLabel[mode]||mode)+'</span></td><td>'+esc(status)+'</td><td><button type="button" class="btn primary" data-pg-review-proposal="'+esc(p.id)+'">'+action+'</button></td></tr>';
+  }).join(''):'<tr><td colspan="5" class="empty">Nenhuma proposta aguardando programação. Propostas recusadas/expiradas não aparecem; propostas já programadas ficam registradas na lista de atividades.</td></tr>';
+  body.querySelectorAll('[data-pg-review-proposal]').forEach(button=>button.addEventListener('click',()=>openProposalReview(button.dataset.pgReviewProposal)));
+ }
+ function localToday(){
+  const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+ }
+ function renderReviewProjectOptions(proposal,selected=''){
+  const clientId=proposal?.client_id;
+  const eligible=data.projects.filter(p=>!clientId||String(p.client_id)===String(clientId)||String(p.id)===String(proposal.project_id));
+  $('ntec-pg-review-project').innerHTML='<option value="">Selecione uma obra</option>'+eligible.map(p=>'<option value="'+esc(p.id)+'">'+esc(projectLabel(p))+'</option>').join('');
+  if(selected&&eligible.some(p=>String(p.id)===String(selected)))$('ntec-pg-review-project').value=selected;
+  else if(proposal?.project_id&&eligible.some(p=>String(p.id)===String(proposal.project_id)))$('ntec-pg-review-project').value=proposal.project_id;
+ }
+ function openProposalReview(id){
+  const proposal=data.proposals.find(p=>String(p.id)===String(id));if(!proposal)return;
+  $('ntec-pg-review-proposal-id').value=proposal.id;
+  $('ntec-pg-review-summary').innerHTML='<strong>'+esc(proposal.proposal_number||'Proposta')+'</strong> · '+esc(proposal.clients?.company_name||'Cliente')+'<p>'+esc(proposal.description||'Escopo não informado')+'</p><small>Status atual: '+esc(proposal.status||'rascunho')+'. Ao confirmar, a proposta ficará aprovada e as atividades serão vinculadas a ela.</small>';
+  renderReviewProjectOptions(proposal,proposal.project_id||'');
+  $('ntec-pg-review-mode').value=inferProposalMode(proposal);
+  $('ntec-pg-review-staff').value=String(proposal.staff_count||1);
+  $('ntec-pg-review-start').value=proposal.service_start_date||localToday();
+  $('ntec-pg-review-end').value=proposal.service_end_date||'';
+  document.querySelectorAll('[data-pg-weekday]').forEach(el=>{el.checked=Array.isArray(proposal.work_weekdays)?proposal.work_weekdays.includes(Number(el.value)):[1,2,3,4,5].includes(Number(el.value))});
+  $('ntec-pg-review-message').textContent='';
+  $('ntec-pg-proposal-review').classList.remove('hidden');
+  updateReviewPreview();
+  $('ntec-pg-proposal-review').scrollIntoView({behavior:'smooth',block:'start'});
+ }
+ function updateReviewPreview(){
+  const mode=$('ntec-pg-review-mode').value,start=$('ntec-pg-review-start').value,end=$('ntec-pg-review-end').value;
+  const staff=Math.max(1,Number($('ntec-pg-review-staff').value||1));
+  $('ntec-pg-review-weekdays').classList.toggle('hidden',mode!=='diaria');
+  let count=0;
+  if(start&&end&&end>=start){
+   const a=new Date(start+'T12:00:00'),b=new Date(end+'T12:00:00');
+   if(mode==='mensal'){
+    let cursor=new Date(a.getFullYear(),a.getMonth(),1,12);
+    while(cursor<=b){count++;cursor=new Date(cursor.getFullYear(),cursor.getMonth()+1,1,12)}
+   }else if(mode==='pontual')count=1;
+   else if(mode==='diaria'){
+    const days=[...document.querySelectorAll('[data-pg-weekday]:checked')].map(el=>Number(el.value));
+    for(let d=new Date(a);d<=b;d.setDate(d.getDate()+1))if(days.includes(d.getDay()===0?7:d.getDay()))count++;
+   }
+  }
+  const units=mode==='mensal'?'faixa(s) mensal(is)':mode==='diaria'?'diária(s)':mode==='pontual'?'serviço pontual':'atividade(s)';
+  let text=mode==='revisar'?'O escopo não deixa claro se o atendimento é mensal, por diária ou pontual. Selecione o modelo correto antes de aprovar.':count?('Serão criadas '+count+' '+units+' para '+staff+' funcionário(s), vinculadas à proposta.'): 'Informe um período válido e, para diária, marque ao menos um dia da semana.';
+  $('ntec-pg-review-preview').textContent=text;
+  return {count,mode};
+ }
+ async function approveSelectedProposal(){
+  const button=$('ntec-pg-review-approve'),proposalId=$('ntec-pg-review-proposal-id').value,mode=$('ntec-pg-review-mode').value;
+  const projectId=$('ntec-pg-review-project').value,start=$('ntec-pg-review-start').value,end=$('ntec-pg-review-end').value;
+  const staff=Number($('ntec-pg-review-staff').value||1);
+  const weekdays=[...document.querySelectorAll('[data-pg-weekday]:checked')].map(el=>Number(el.value));
+  const preview=updateReviewPreview(),msg=$('ntec-pg-review-message');
+  if(!proposalId||!projectId||!start||!end||end<start||mode==='revisar'||!Number.isInteger(staff)||staff<1||staff>100||(mode==='diaria'&&!weekdays.length)){
+   msg.textContent='Revise o modelo de atendimento, a obra, a quantidade, o período e os dias de trabalho.';msg.style.color='#b42318';return;
+  }
+  if(!preview.count){msg.textContent='O período não gera nenhuma atividade. Revise as datas e os dias selecionados.';msg.style.color='#b42318';return}
+  const proposal=data.proposals.find(p=>String(p.id)===String(proposalId));
+  if(!proposal)return;
+  if(!confirm('Aprovar a proposta '+(proposal.proposal_number||'')+' e gerar '+preview.count+' atividade(s) de '+serviceModeLabel[mode]+'? As atividades ficarão vinculadas à proposta e poderão ser editadas depois.'))return;
+  button.disabled=true;button.textContent='Aprovando e programando…';msg.textContent='Salvando aprovação e criando atividades…';msg.style.color='';
+  try{
+   const result=await window.NTEC_SUPABASE.approveProposalAndSchedule({
+    proposal_id:proposalId,project_id:projectId,service_mode:mode,staff_count:staff,
+    service_start_date:start,service_end_date:end,work_weekdays:weekdays
+   });
+   $('ntec-pg-proposal-review').classList.add('hidden');
+   loaded=false;await loadData(true);
+   message('Proposta '+(result.proposal?.proposal_number||'')+' aprovada. '+result.scheduledCount+' atividade(s) criada(s) na programação.');
+  }catch(error){msg.textContent='Não foi possível fechar a proposta e gerar a programação: '+(error?.message||'erro desconhecido');msg.style.color='#b42318'}
+  finally{button.disabled=false;button.textContent='Aprovar proposta e gerar programação'}
+ }
  function refreshLinkedOptions(keepProposal='',keepReport=''){
   const projectId=$('ntec-pg-project').value;
   const proposals=approvedProposalsForProject(projectId),proposalEl=$('ntec-pg-proposal');
@@ -239,7 +333,7 @@ runtime = r'''<script>
    const statusClass=item.status==='concluido'?' done':item.status==='cancelado'?' overdue':'';
    const parentText=item.parent_item_id?'Ruptura programada a partir da moldagem':'';
    const ruptureAction=item.item_type==='ruptura'&&item.report_id?'<button type="button" class="btn" data-pg-open-rupture="'+esc(item.report_id)+'">Lançar ensaio</button>':'';
-   return '<tr><td><strong>'+esc(datePt(item.scheduled_date))+'</strong><span class="ntec-pg-sub">'+esc(item.scheduled_time?String(item.scheduled_time).slice(0,5):'Horário não definido')+(item.duration_minutes?' · '+esc(item.duration_minutes)+' min':'')+'</span></td><td><strong>'+esc(item.title)+'</strong><span class="ntec-pg-sub">'+esc(project.name||'Obra')+' · '+esc(project.clients?.company_name||'Cliente')+'</span><span class="ntec-pg-sub">'+esc(details)+'</span>'+(parentText?'<span class="ntec-pg-sub">'+esc(parentText)+'</span>':'')+'</td><td>'+(proposal.proposal_number?'<strong>'+esc(proposal.proposal_number)+'</strong>':'<span class="ntec-pg-sub">Sem proposta</span>')+'<span class="ntec-pg-sub">'+(report.report_number?esc(report.report_number)+' · ':'')+esc(report.title||'Sem relatório vinculado')+'</span>'+(item.quantity!=null?'<span class="ntec-pg-sub">Quantidade prevista: '+esc(item.quantity)+' '+esc(item.unit)+'</span>':'')+'</td><td>'+esc(series)+'<span class="ntec-pg-sub">'+esc(age)+'</span></td><td><span class="ntec-pg-tag'+statusClass+'">'+esc(statusLabel[item.status]||item.status)+'</span></td><td><div class="ntec-pg-buttons">'+ruptureAction+'<button type="button" class="btn" data-pg-edit="'+esc(item.id)+'">Editar</button><button type="button" class="btn" data-pg-delete="'+esc(item.id)+'">Excluir</button></div></td></tr>';
+   return '<tr><td><strong>'+esc(datePt(item.scheduled_date))+(item.scheduled_end_date&&item.scheduled_end_date!==item.scheduled_date?' a '+esc(datePt(item.scheduled_end_date)):'')+'</strong><span class="ntec-pg-sub">'+esc(item.scheduled_time?String(item.scheduled_time).slice(0,5):'Horário não definido')+(item.duration_minutes?' · '+esc(item.duration_minutes)+' min':'')+'</span></td><td><strong>'+esc(item.title)+'</strong><span class="ntec-pg-sub">'+esc(project.name||'Obra')+' · '+esc(project.clients?.company_name||'Cliente')+'</span><span class="ntec-pg-sub">'+esc(details)+'</span>'+(parentText?'<span class="ntec-pg-sub">'+esc(parentText)+'</span>':'')+'</td><td>'+(proposal.proposal_number?'<strong>'+esc(proposal.proposal_number)+'</strong>':'<span class="ntec-pg-sub">Sem proposta</span>')+'<span class="ntec-pg-sub">'+(report.report_number?esc(report.report_number)+' · ':'')+esc(report.title||'Sem relatório vinculado')+'</span>'+(item.quantity!=null?'<span class="ntec-pg-sub">Quantidade prevista: '+esc(item.quantity)+' '+esc(item.unit)+'</span>':'')+'</td><td>'+esc(series)+'<span class="ntec-pg-sub">'+esc(age)+'</span></td><td><span class="ntec-pg-tag'+statusClass+'">'+esc(statusLabel[item.status]||item.status)+'</span></td><td><div class="ntec-pg-buttons">'+ruptureAction+'<button type="button" class="btn" data-pg-edit="'+esc(item.id)+'">Editar</button><button type="button" class="btn" data-pg-delete="'+esc(item.id)+'">Excluir</button></div></td></tr>';
   }).join(''):'<tr><td class="ntec-pg-empty" colspan="6">'+(data.items.length?'Nenhuma atividade corresponde ao filtro.':'Nenhuma atividade programada. Clique em “Nova atividade” para começar.')+'</td></tr>';
   $('ntec-pg-body').querySelectorAll('[data-pg-edit]').forEach(button=>button.addEventListener('click',()=>editItem(button.dataset.pgEdit)));
   $('ntec-pg-body').querySelectorAll('[data-pg-delete]').forEach(button=>button.addEventListener('click',()=>deleteItem(button.dataset.pgDelete)));
@@ -251,7 +345,7 @@ runtime = r'''<script>
   try{
    data=await window.NTEC_SUPABASE.loadProgrammingData();loaded=true;
    renderProjects($('ntec-pg-project').value);
-   renderTable();message('');
+   renderProposalQueue();renderTable();message('');
   }catch(error){
    const text=error?.message||'erro desconhecido';message('Não foi possível carregar a programação: '+text,true);
    if(/administrativo|login/i.test(text)){
@@ -340,6 +434,13 @@ runtime = r'''<script>
   $('ntec-pg-search')?.addEventListener('input',renderTable);
   $('ntec-pg-filter')?.addEventListener('change',renderTable);
   $('ntec-pg-project')?.addEventListener('change',()=>refreshLinkedOptions());
+  $('ntec-pg-review-mode')?.addEventListener('change',updateReviewPreview);
+  $('ntec-pg-review-start')?.addEventListener('change',updateReviewPreview);
+  $('ntec-pg-review-end')?.addEventListener('change',updateReviewPreview);
+  $('ntec-pg-review-staff')?.addEventListener('input',updateReviewPreview);
+  document.querySelectorAll('[data-pg-weekday]').forEach(el=>el.addEventListener('change',updateReviewPreview));
+  $('ntec-pg-review-approve')?.addEventListener('click',approveSelectedProposal);
+  $('ntec-pg-review-cancel')?.addEventListener('click',()=>{$('ntec-pg-proposal-review').classList.add('hidden');$('ntec-pg-review-message').textContent=''});
   $('ntec-pg-type')?.addEventListener('change',()=>{
    const type=$('ntec-pg-type').value;syncMoldingOptions();
    if(type==='ruptura'&&$('ntec-pg-status').value==='planejado')$('ntec-pg-status').value='aguardando_resultado';
