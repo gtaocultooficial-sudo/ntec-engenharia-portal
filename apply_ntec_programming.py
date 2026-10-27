@@ -111,6 +111,62 @@ async syncProgrammingRuptures(reportId,measuredByAge,reportComplete=false){
  }
  return true;
 },
+async loadProposalIntake(){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Faça login como administrador para analisar solicitações.');
+ const [requestsResult,projectsResult,proposalsResult]=await Promise.all([
+  supabase.from('proposal_requests').select('id,full_name,company_name,email,phone,service,project_location,details,consent_to_contact,status,created_at').order('created_at',{ascending:false}),
+  supabase.from('projects').select('id,name,client_id,work_number,status,clients(company_name)').order('created_at',{ascending:false}),
+  supabase.from('proposals').select('id,proposal_number,source_request_id,status').not('source_request_id','is',null)
+ ]);
+ for(const result of [requestsResult,projectsResult,proposalsResult])if(result.error)throw result.error;
+ const linked=proposalsResult.data||[];
+ return {requests:(requestsResult.data||[]).map(r=>({...r,linked_proposal:linked.find(p=>p.source_request_id===r.id)||null})),projects:projectsResult.data||[]};
+},
+async updateProposalRequestStatus(id,status){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ if(!['recebida','em_atendimento','proposta_criada','encerrada'].includes(status))throw new Error('Status de solicitação inválido.');
+ const {data,error}=await supabase.from('proposal_requests').update({status}).eq('id',id).select('id,status').single();
+ if(error)throw error;
+ return data;
+},
+async createDraftProposalFromRequest(payload){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ if(!payload?.request_id)throw new Error('Selecione uma solicitação original.');
+ if(!String(payload.service||'').trim())throw new Error('Informe o serviço da proposta.');
+ if(!String(payload.description||'').trim())throw new Error('Revise e preencha o escopo proposto.');
+ const amount=Number(payload.amount);
+ if(!Number.isFinite(amount)||amount<=0)throw new Error('Informe um valor maior que zero para a proposta.');
+ if(payload.service_mode&&!['mensal','diaria','pontual','revisar'].includes(payload.service_mode))throw new Error('Modelo de cobrança inválido.');
+ const {data:request,error:requestError}=await supabase.from('proposal_requests').select('id,full_name,company_name,email,phone,service,project_location,details,status').eq('id',payload.request_id).single();
+ if(requestError)throw requestError;
+ const {data:prior,error:priorError}=await supabase.from('proposals').select('id,proposal_number,status').eq('source_request_id',request.id).limit(1);
+ if(priorError)throw priorError;
+ if(prior?.length)throw new Error('Esta solicitação já tem uma proposta vinculada: '+prior[0].proposal_number+'. Atualize a lista para conferi-la.');
+ let client=null;
+ if(String(request.email||'').trim()){
+  const found=await supabase.from('clients').select('id,company_name,contact_name,email,phone').eq('email',String(request.email).trim()).limit(1);
+  if(found.error)throw found.error;
+  client=found.data?.[0]||null;
+ }
+ const company=String(request.company_name||request.full_name||'Cliente da solicitação').trim();
+ if(!client){
+  const found=await supabase.from('clients').select('id,company_name,contact_name,email,phone').eq('company_name',company).limit(1);
+  if(found.error)throw found.error;
+  client=found.data?.[0]||null;
+ }
+ if(!client){
+  const created=await supabase.from('clients').insert({company_name:company,contact_name:String(request.full_name||''),email:String(request.email||''),phone:String(request.phone||'')}).select('id,company_name,contact_name,email,phone').single();
+  if(created.error)throw created.error;
+  client=created.data;
+ }
+ const proposalNumber='PROP-'+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+ const staffMode=['mensal','diaria'].includes(payload.service_mode);
+ const proposalPayload={client_id:client.id,project_id:payload.project_id||null,proposal_number:proposalNumber,description:String(payload.description).trim(),amount,valid_until:payload.valid_until||null,status:'rascunho',source_request_id:request.id,service_mode:payload.service_mode||'revisar',staff_count:staffMode?Math.max(1,Math.min(100,Math.floor(Number(payload.staff_count||1)))):null};
+ const createdProposal=await supabase.from('proposals').insert(proposalPayload).select('id,proposal_number,status,amount,source_request_id').single();
+ if(createdProposal.error)throw createdProposal.error;
+ const statusUpdate=await supabase.from('proposal_requests').update({status:'proposta_criada'}).eq('id',request.id);
+ return {proposal:createdProposal.data,requestStatusUpdated:!statusUpdate.error,warning:statusUpdate.error?.message||null};
+},
 getProgrammingAccess(){return Boolean(currentSession&&currentProfile?.role==='admin');},
 """
 once("async saveReport(r){", api_methods + "async saveReport(r){", "API do módulo de programação")
