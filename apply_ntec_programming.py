@@ -249,6 +249,29 @@ nav_anchor = '<button data-page="propostas">▤ <span>Propostas</span></button><
 nav_new = nav_new.replace('<button data-page="programacao">▦ <span>Programação</span></button>', '<button data-page="programacao">▦ <span>Programação</span></button><button data-page="demonstrativo-precos">▧ <span>Demonstrativo de preços</span></button>')
 once(nav_anchor, nav_new, "navegação da programação")
 
+pricing_section = r'''<section class="page hidden" id="page-demonstrativo-precos">
+ <div class="titleline"><div><h1>Demonstrativo de preços</h1><p>Monte a composição comercial por item separadamente da solicitação do cliente e da programação da obra.</p></div><button class="btn" id="ntec-price-refresh" type="button">Atualizar propostas</button></div>
+ <div class="panel">
+  <div class="formgrid">
+   <div class="field"><label for="ntec-price-proposal-select">Proposta comercial *</label><select id="ntec-price-proposal-select"><option value="">Carregando propostas…</option></select></div>
+   <div class="field"><label>Cliente</label><div id="ntec-price-client" class="ntec-pg-proposal-summary">Selecione uma proposta.</div></div>
+  </div>
+  <div id="ntec-price-proposal-meta" class="ntec-pg-proposal-summary">Selecione uma proposta para iniciar o demonstrativo.</div>
+  <div id="ntec-price-editor" class="hidden">
+   <div class="titleline"><div><h2>Itens do demonstrativo</h2><p class="sub">Lance serviços, mão de obra, materiais, ensaios, deslocamentos e outras parcelas do preço.</p></div><button class="btn" type="button" id="ntec-price-add-item">+ Adicionar item</button></div>
+   <div class="tablewrap"><table class="ntec-pg-table ntec-line-items-table"><thead><tr><th>Item / descrição</th><th>Quantidade</th><th>Unidade</th><th>Preço unitário (R$)</th><th>Desconto (%)</th><th>Valor do item (R$)</th><th>Ação</th></tr></thead><tbody id="ntec-price-items-body"></tbody></table></div>
+   <div class="ntec-price-summary">
+    <div><span>Subtotal bruto</span><strong id="ntec-price-subtotal">R$ 0,00</strong></div>
+    <div><span>Descontos</span><strong id="ntec-price-discounts">R$ 0,00</strong></div>
+    <div class="grand"><span>Total do demonstrativo</span><strong id="ntec-price-total">R$ 0,00</strong></div>
+   </div>
+   <div class="ntec-pg-actions"><button class="btn primary" type="button" id="ntec-price-save">Salvar demonstrativo e atualizar o total</button><button class="btn" type="button" id="ntec-price-pdf">Visualizar / imprimir demonstrativo</button><span id="ntec-price-message" role="status" aria-live="polite"></span></div>
+   <p class="footnote">O demonstrativo é salvo separadamente, vinculado à proposta. Salvar atualiza o total comercial; não envia a proposta nem aprova a contratação.</p>
+  </div>
+ </div>
+</section>
+'''
+
 section = r'''<section class="page hidden" id="page-programacao">
  <div class="titleline"><div><h1>Programação de atividades</h1><p>Organize visitas, moldagens, rupturas, ensaios e entregas por obra, usando propostas aprovadas como referência.</p></div><button class="btn primary" id="ntec-pg-new" type="button">+ Nova atividade</button></div>
  <div class="panel" id="ntec-pg-proposal-queue">
@@ -318,6 +341,7 @@ _medicoes = re.findall(r'<section\b(?=[^>]*\bid=["\']page-medicoes["\'])[^>]*>',
 if len(_medicoes) != 1:
     raise SystemExit("seção da programação: esperado 1 início de seção page-medicoes, encontrados " + str(len(_medicoes)))
 s = s.replace(_medicoes[0], section + "\n" + _medicoes[0], 1)
+s = s.replace(_medicoes[0], pricing_section + "\n" + _medicoes[0], 1)
 
 css = r'''
 .ntec-pg-proposal-summary,.ntec-pg-schedule-preview{padding:12px;background:#f4f7fa;border:1px solid var(--line);border-radius:9px;margin:10px 0 14px;line-height:1.5;font-size:13px}.ntec-pg-weekdays{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0}.ntec-pg-weekdays label{display:flex;align-items:center;gap:5px}.ntec-pg-weekdays input{width:auto}.ntec-pg-molding-options{margin:10px 0;padding:12px;background:#f4f7fa;border:1px solid var(--line);border-radius:9px}.ntec-pg-auto-label{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}.ntec-pg-auto-label input{width:auto}.ntec-pg-molding-options .field{margin:10px 0 0;max-width:260px}.ntec-pg-metrics{margin:12px 0 18px}.ntec-pg-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ntec-pg-toolbar input{flex:1;min-width:200px}.ntec-pg-toolbar select{min-height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;color:var(--ink)}.ntec-pg-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px}.ntec-pg-actions [role=status]{font-size:12px;color:var(--muted)}.ntec-pg-table td{vertical-align:top}.ntec-pg-sub{display:block;color:var(--muted);font-size:12px;margin-top:4px}.ntec-pg-tag{display:inline-block;border-radius:999px;background:#edf2f7;color:#334155;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap}.ntec-pg-tag.overdue{background:#fff1f0;color:#9b1c1c}.ntec-pg-tag.done{background:#e9f7ef;color:#166534}.ntec-pg-buttons{display:flex;gap:5px;flex-wrap:wrap}.ntec-pg-buttons .btn{padding:6px 8px;font-size:11px}.ntec-pg-empty{padding:22px;text-align:center;color:var(--muted)}@media(max-width:700px){.ntec-pg-toolbar>*{width:100%;min-width:0}.ntec-pg-actions #ntec-pg-message{width:100%}}
