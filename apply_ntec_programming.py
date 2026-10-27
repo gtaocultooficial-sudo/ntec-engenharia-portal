@@ -246,6 +246,7 @@ getProgrammingAccess(){return Boolean(currentSession&&currentProfile?.role==='ad
 once("async saveReport(r){", api_methods + "async saveReport(r){", "API do módulo de programação")
 
 nav_anchor = '<button data-page="propostas">▤ <span>Propostas</span></button><button data-page="medicoes">▧ <span>Medições</span></button>'
+nav_new = '<button data-page="propostas">▤ <span>Propostas</span></button><button data-page="programacao">▦ <span>Programação</span></button><button data-page="medicoes">▧ <span>Medições</span></button>'
 nav_new = nav_new.replace('<button data-page="programacao">▦ <span>Programação</span></button>', '<button data-page="programacao">▦ <span>Programação</span></button><button data-page="demonstrativo-precos">▧ <span>Demonstrativo de preços</span></button>')
 once(nav_anchor, nav_new, "navegação da programação")
 
