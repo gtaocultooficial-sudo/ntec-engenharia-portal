@@ -85,10 +85,10 @@ section = r'''<section class="page hidden" id="page-programacao">
 </section>
 '''
 import re
-_medicoes = re.findall(r'<section\\b(?=[^>]*\\bid=["\\']page-medicoes["\\'])[^>]*>', s)
+_medicoes = re.findall(r'<section\b(?=[^>]*\bid=["\']page-medicoes["\'])[^>]*>', s)
 if len(_medicoes) != 1:
     raise SystemExit("seção da programação: esperado 1 início de seção page-medicoes, encontrados " + str(len(_medicoes)))
-s = s.replace(_medicoes[0], section + "\\n" + _medicoes[0], 1)
+s = s.replace(_medicoes[0], section + "\n" + _medicoes[0], 1)
 
 css = r'''
 .ntec-pg-metrics{margin:12px 0 18px}.ntec-pg-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ntec-pg-toolbar input{flex:1;min-width:200px}.ntec-pg-toolbar select{min-height:40px;border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;color:var(--ink)}.ntec-pg-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px}.ntec-pg-actions [role=status]{font-size:12px;color:var(--muted)}.ntec-pg-table td{vertical-align:top}.ntec-pg-sub{display:block;color:var(--muted);font-size:12px;margin-top:4px}.ntec-pg-tag{display:inline-block;border-radius:999px;background:#edf2f7;color:#334155;padding:4px 8px;font-size:11px;font-weight:700;white-space:nowrap}.ntec-pg-tag.overdue{background:#fff1f0;color:#9b1c1c}.ntec-pg-tag.done{background:#e9f7ef;color:#166534}.ntec-pg-buttons{display:flex;gap:5px;flex-wrap:wrap}.ntec-pg-buttons .btn{padding:6px 8px;font-size:11px}.ntec-pg-empty{padding:22px;text-align:center;color:var(--muted)}@media(max-width:700px){.ntec-pg-toolbar>*{width:100%;min-width:0}.ntec-pg-actions #ntec-pg-message{width:100%}}
