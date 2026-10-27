@@ -174,21 +174,21 @@ async saveProposalPricing(payload){
 },
 async loadProposalReferenceValues(){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
- const {data,error}=await supabase.from('proposal_reference_values').select('id,item_name,category,unit,reference_price,notes,is_active,created_at,updated_at').order('category',{ascending:true}).order('item_name',{ascending:true});
+ const {data,error}=await supabase.from('proposal_reference_values').select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').order('source_sheet_order',{ascending:true}).order('source_row',{ascending:true}).order('item_code',{ascending:true});
  if(error)throw error;
  return data||[];
 },
 async saveProposalReferenceValue(payload){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
- const item_name=String(payload?.item_name||'').trim(),category=String(payload?.category||'Serviços').trim(),unit=String(payload?.unit||'serviço').trim(),reference_price=Number(payload?.reference_price);
+ const item_name=String(payload?.item_name||'').trim(),item_code=String(payload?.item_code||'').trim()||null,section_name=String(payload?.section_name||'').trim()||String(payload?.category||'Outros serviços').trim(),category=String(payload?.category||'').trim(),unit=String(payload?.unit||'serviço').trim(),reference_price=Number(payload?.reference_price),price_label=String(payload?.price_label||'').trim()||null;
  if(!item_name)throw new Error('Informe a descrição do item.');
  if(!category)throw new Error('Informe a categoria.');
  if(!unit)throw new Error('Informe a unidade.');
  if(!Number.isFinite(reference_price)||reference_price<0)throw new Error('Informe um valor de referência válido.');
- const row={item_name,category,unit,reference_price,notes:String(payload?.notes||'').trim(),updated_at:new Date().toISOString()};
+ const row={item_name,item_code,section_name,category,unit,reference_price,price_label,notes:String(payload?.notes||'').trim(),updated_at:new Date().toISOString()};
  let result;
- if(payload.id)result=await supabase.from('proposal_reference_values').update(row).eq('id',payload.id).select('id,item_name,category,unit,reference_price,notes,is_active,created_at,updated_at').single();
- else result=await supabase.from('proposal_reference_values').insert({...row,is_active:true}).select('id,item_name,category,unit,reference_price,notes,is_active,created_at,updated_at').single();
+ if(payload.id)result=await supabase.from('proposal_reference_values').update(row).eq('id',payload.id).select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').single();
+ else result=await supabase.from('proposal_reference_values').insert({...row,is_active:true}).select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').single();
  if(result.error)throw result.error;
  return result.data;
 },
@@ -370,7 +370,7 @@ reference_values_runtime = r'''<script>
  const $=id=>document.getElementById(id);
  function findHeading(){
   return [...document.querySelectorAll('h1,h2,h3,h4,[role="heading"],.panel-title,.section-title')]
-   .find(el=>norm(el.textContent)==='valores de referencia para proposta');
+   .find(el=>norm(el.textContent).includes('valores de referencia para proposta'));
  }
  function setMsg(text,error=false){
   const el=$('ntec-ref-price-message');if(el){el.textContent=text||'';el.style.color=error?'#b42318':'var(--muted)'}
@@ -379,12 +379,12 @@ reference_values_runtime = r'''<script>
   if($('ntec-ref-price-panel'))return true;
   const heading=findHeading();if(!heading)return false;
   const panel=document.createElement('div');panel.id='ntec-ref-price-panel';panel.className='panel';panel.style.cssText='margin:14px 0;padding:16px';
-  panel.innerHTML='<div class="titleline"><div><h3>Cadastro de valores de referência</h3><p class="sub">Cadastre o preço de referência de cada serviço ou item. Estes valores servem de base para montar propostas; revise-os antes de enviar um orçamento ao cliente.</p></div><button class="btn" id="ntec-ref-price-refresh" type="button">Atualizar lista</button></div>'+
-  '<div class="formgrid"><div class="field"><label for="ntec-ref-price-name">Item / serviço *</label><input id="ntec-ref-price-name" maxlength="180" placeholder="Ex.: acompanhamento mensal de obra" required></div><div class="field"><label for="ntec-ref-price-category">Categoria *</label><input id="ntec-ref-price-category" maxlength="100" list="ntec-ref-price-categories" placeholder="Ex.: Controle tecnológico" required><datalist id="ntec-ref-price-categories"><option>Controle tecnológico</option><option>Ensaios laboratoriais</option><option>Mão de obra</option><option>Manutenção predial</option><option>Geotecnia / sondagem</option><option>Acompanhamento de obra</option><option>Laudos e relatórios</option><option>Deslocamento</option><option>Materiais</option><option>Outros serviços</option></datalist></div><div class="field"><label for="ntec-ref-price-unit">Unidade de cobrança *</label><input id="ntec-ref-price-unit" maxlength="40" list="ntec-ref-price-units" placeholder="un., hora, diária, mês, m²…" required><datalist id="ntec-ref-price-units"><option>serviço</option><option>un.</option><option>hora</option><option>diária</option><option>mês</option><option>visita</option><option>m²</option><option>m³</option><option>km</option><option>ensaio</option><option>corpo de prova</option></datalist></div><div class="field"><label for="ntec-ref-price-value">Valor de referência por unidade (R$) *</label><input id="ntec-ref-price-value" type="number" min="0" step="0.01" placeholder="0,00" required></div></div>'+
+  panel.innerHTML='<div class="titleline"><div><h3>Cadastro de valores de referência</h3><p class="sub">Tabela de referência baseada no RG 28. Itens organizados por especialidade, grupo de serviço, código, unidade, preço e observações.</p></div><button class="btn" id="ntec-ref-price-refresh" type="button">Atualizar lista</button></div>'+
+  '<div class="formgrid"><div class="field"><label for="ntec-ref-price-code">Código do item</label><input id="ntec-ref-price-code" maxlength="30" placeholder="Ex.: 1.1"></div><div class="field"><label for="ntec-ref-price-category">Especialidade *</label><select id="ntec-ref-price-category" required><option value="">Selecione a especialidade</option><option>SONDAGENS E GEOLOGIA</option><option>ENSAIOS DE SOLO</option><option>Massa Afaltica</option><option>Ensaios de Concreto</option><option>Ensaios de Argamassa</option><option>Ensaios de Graute</option><option>Blocos &amp; Bloquete e Artefatos</option><option>Agregados</option><option>Furo e Corte em Concreto</option><option>Outros serviços</option></select></div><div class="field"><label for="ntec-ref-price-section">Grupo / seção *</label><input id="ntec-ref-price-section" maxlength="180" placeholder="Ex.: ENSAIOS CONCRETO" required></div><div class="field"><label for="ntec-ref-price-name">Descrição do item / serviço *</label><input id="ntec-ref-price-name" maxlength="250" placeholder="Descrição conforme tabela" required></div><div class="field"><label for="ntec-ref-price-unit">Unidade *</label><input id="ntec-ref-price-unit" maxlength="40" placeholder="Unidade, ML, VB, HORA..." required></div><div class="field"><label for="ntec-ref-price-value">Valor unitário (R$) *</label><input id="ntec-ref-price-value" type="number" min="0" step="0.01" placeholder="0,00" required></div></div>'+\n  '<div class="formgrid"><div class="field"><label for="ntec-ref-price-label">Valor textual (opcional)</label><input id="ntec-ref-price-label" maxlength="80" placeholder="Ex.: Incluso"></div></div>'+
   '<div class="field"><label for="ntec-ref-price-notes">Observações / o que está incluído (opcional)</label><textarea id="ntec-ref-price-notes" rows="2" maxlength="1200" placeholder="Premissas, limites do serviço, exclusões ou quando este valor deve ser revisado."></textarea></div>'+
   '<div class="ntec-ref-actions"><button class="btn primary" id="ntec-ref-price-save" type="button">Salvar valor de referência</button><button class="btn hidden" id="ntec-ref-price-cancel" type="button">Cancelar edição</button><span id="ntec-ref-price-message" role="status" aria-live="polite"></span></div>'+
-  '<div class="toolbar" style="margin-top:18px"><input id="ntec-ref-price-search" class="btn" placeholder="Buscar item ou categoria…"><select id="ntec-ref-price-status" class="btn" aria-label="Filtrar itens"><option value="active">Itens ativos</option><option value="all">Todos os itens</option><option value="inactive">Inativos</option></select></div>'+
-  '<div class="tablewrap"><table class="ntec-pg-table" id="ntec-ref-price-table"><thead><tr><th>Item / serviço</th><th>Categoria</th><th>Unidade</th><th>Valor de referência</th><th>Observações</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ntec-ref-price-body"><tr><td colspan="7" class="empty">Carregando valores…</td></tr></tbody></table></div>'+
+  '<div class="toolbar" style="margin-top:18px"><input id="ntec-ref-price-search" class="btn" placeholder="Buscar código, grupo, descrição ou categoria…"><select id="ntec-ref-price-category-filter" class="btn" aria-label="Filtrar especialidade"><option value="">Todas as especialidades</option><option>SONDAGENS E GEOLOGIA</option><option>ENSAIOS DE SOLO</option><option>Massa Afaltica</option><option>Ensaios de Concreto</option><option>Ensaios de Argamassa</option><option>Ensaios de Graute</option><option>Blocos &amp; Bloquete e Artefatos</option><option>Agregados</option><option>Furo e Corte em Concreto</option><option>Outros serviços</option></select><select id="ntec-ref-price-status" class="btn" aria-label="Filtrar itens"><option value="active">Itens ativos</option><option value="all">Todos os itens</option><option value="inactive">Inativos</option></select></div>'+
+  '<div class="tablewrap"><table class="ntec-pg-table" id="ntec-ref-price-table"><thead><tr><th>Código</th><th>Grupo / seção</th><th>Descrição do item / serviço</th><th>Especialidade</th><th>Unidade</th><th>Valor unitário</th><th>Observações</th><th>Status</th><th>Ações</th></tr></thead><tbody id="ntec-ref-price-body"><tr><td colspan="9" class="empty">Carregando valores…</td></tr></tbody></table></div>'+
   '<p class="footnote">O cadastro não substitui o orçamento específico. Ajuste o valor conforme quantidades, localização, prazo, equipe, equipamentos e condições reais de cada proposta.</p>';
   const style=document.createElement('style');style.id='ntec-ref-price-style';style.textContent='#ntec-ref-price-panel .ntec-ref-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:12px 0}.ntec-ref-actions [role=status]{font-size:12px}.ntec-ref-actions button:disabled{opacity:.55;cursor:wait}#ntec-ref-price-table td{vertical-align:top}#ntec-ref-price-table .ntec-ref-price-money{white-space:nowrap;font-weight:750}#ntec-ref-price-table .ntec-ref-status{display:inline-block;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:700;background:#e9f7ef;color:#166534}#ntec-ref-price-table .ntec-ref-status.off{background:#f1f5f9;color:#475569}#ntec-ref-price-panel .toolbar{display:flex;gap:10px;flex-wrap:wrap}#ntec-ref-price-panel .toolbar input{flex:1;min-width:200px}#ntec-ref-price-panel .toolbar select{min-width:150px}@media(max-width:700px){#ntec-ref-price-panel .toolbar>*{width:100%;min-width:0}}';
   document.head.appendChild(style);
@@ -393,28 +393,29 @@ reference_values_runtime = r'''<script>
   $('ntec-ref-price-save').addEventListener('click',save);
   $('ntec-ref-price-cancel').addEventListener('click',resetForm);
   $('ntec-ref-price-search').addEventListener('input',render);
+  $('ntec-ref-price-category-filter').addEventListener('change',render);
   $('ntec-ref-price-status').addEventListener('change',render);
   return true;
  }
  function resetForm(){
   editingId=null;
-  ['ntec-ref-price-name','ntec-ref-price-category','ntec-ref-price-unit','ntec-ref-price-value','ntec-ref-price-notes'].forEach(id=>{if($(id))$(id).value=''});
-  $('ntec-ref-price-category').value='Serviços';$('ntec-ref-price-unit').value='serviço';
+  ['ntec-ref-price-code','ntec-ref-price-name','ntec-ref-price-section','ntec-ref-price-category','ntec-ref-price-unit','ntec-ref-price-value','ntec-ref-price-label','ntec-ref-price-notes'].forEach(id=>{if($(id))$(id).value=''});
+  $('ntec-ref-price-category').value='Outros serviços';$('ntec-ref-price-section').value='Outros serviços';$('ntec-ref-price-unit').value='serviço';
   $('ntec-ref-price-save').textContent='Salvar valor de referência';$('ntec-ref-price-cancel').classList.add('hidden');
   setMsg('Pronto para cadastrar um novo item.');
  }
  function render(){
   const body=$('ntec-ref-price-body');if(!body)return;
-  const query=norm($('ntec-ref-price-search')?.value||''),filter=$('ntec-ref-price-status')?.value||'active';
-  const visible=rows.filter(r=>(filter==='all'||(filter==='active'?r.is_active:!r.is_active))&&(!query||norm([r.item_name,r.category,r.unit,r.notes].join(' ')).includes(query)));
-  body.innerHTML=visible.length?visible.map(r=>'<tr><td><strong>'+esc(r.item_name)+'</strong></td><td>'+esc(r.category)+'</td><td>'+esc(r.unit)+'</td><td class="ntec-ref-price-money">'+money(r.reference_price)+'</td><td>'+esc(r.notes||'—')+'</td><td><span class="ntec-ref-status '+(r.is_active?'':'off')+'">'+(r.is_active?'Ativo':'Inativo')+'</span></td><td><div class="ntec-ref-actions"><button class="btn" data-ref-edit="'+esc(r.id)+'" type="button">Editar</button><button class="btn" data-ref-toggle="'+esc(r.id)+'" data-next="'+(!r.is_active)+'" type="button">'+(r.is_active?'Desativar':'Reativar')+'</button></div></td></tr>').join(''):'<tr><td colspan="7" class="empty">Nenhum valor de referência encontrado. Use o formulário acima para cadastrar o primeiro item.</td></tr>';
+  const query=norm($('ntec-ref-price-search')?.value||''),filter=$('ntec-ref-price-status')?.value||'active',categoryFilter=$('ntec-ref-price-category-filter')?.value||'';
+  const visible=rows.filter(r=>(!categoryFilter||r.category===categoryFilter)&&(filter==='all'||(filter==='active'?r.is_active:!r.is_active))&&(!query||norm([r.item_code,r.section_name,r.item_name,r.category,r.unit,r.price_label,r.notes].join(' ')).includes(query)));
+  body.innerHTML=visible.length?visible.map(r=>'<tr><td>'+esc(r.item_code||'—')+'</td><td>'+esc(r.section_name||'—')+'</td><td><strong>'+esc(r.item_name)+'</strong></td><td>'+esc(r.category)+'</td><td>'+esc(r.unit)+'</td><td class="ntec-ref-price-money">'+esc(r.price_label||money(r.reference_price))+'</td><td>'+esc(r.notes||'—')+'</td><td><span class="ntec-ref-status '+(r.is_active?'':'off')+'">'+(r.is_active?'Ativo':'Inativo')+'</span></td><td><div class="ntec-ref-actions"><button class="btn" data-ref-edit="'+esc(r.id)+'" type="button">Editar</button><button class="btn" data-ref-toggle="'+esc(r.id)+'" data-next="'+(!r.is_active)+'" type="button">'+(r.is_active?'Desativar':'Reativar')+'</button></div></td></tr>').join(''):'<tr><td colspan="9" class="empty">Nenhum valor de referência encontrado. Ajuste os filtros ou cadastre um item.</td></tr>';
   body.querySelectorAll('[data-ref-edit]').forEach(btn=>btn.addEventListener('click',()=>edit(btn.dataset.refEdit)));
   body.querySelectorAll('[data-ref-toggle]').forEach(btn=>btn.addEventListener('click',()=>toggle(btn.dataset.refToggle,btn.dataset.next==='true')));
  }
  function edit(id){
   const r=rows.find(x=>String(x.id)===String(id));if(!r)return;
-  editingId=r.id;$('ntec-ref-price-name').value=r.item_name;$('ntec-ref-price-category').value=r.category;
-  $('ntec-ref-price-unit').value=r.unit;$('ntec-ref-price-value').value=Number(r.reference_price).toFixed(2);$('ntec-ref-price-notes').value=r.notes||'';
+  editingId=r.id;$('ntec-ref-price-code').value=r.item_code||'';$('ntec-ref-price-name').value=r.item_name;$('ntec-ref-price-category').value=r.category;
+  $('ntec-ref-price-section').value=r.section_name||r.category;$('ntec-ref-price-unit').value=r.unit;$('ntec-ref-price-value').value=Number(r.reference_price).toFixed(2);$('ntec-ref-price-label').value=r.price_label||'';$('ntec-ref-price-notes').value=r.notes||'';
   $('ntec-ref-price-save').textContent='Salvar alterações';$('ntec-ref-price-cancel').classList.remove('hidden');
   setMsg('Editando: '+r.item_name);$('ntec-ref-price-panel').scrollIntoView({behavior:'smooth',block:'start'});
  }
@@ -427,7 +428,7 @@ reference_values_runtime = r'''<script>
  }
  async function save(){
   if(busy)return;
-  const payload={id:editingId||undefined,item_name:$('ntec-ref-price-name').value.trim(),category:$('ntec-ref-price-category').value.trim(),unit:$('ntec-ref-price-unit').value.trim(),reference_price:Number($('ntec-ref-price-value').value),notes:$('ntec-ref-price-notes').value.trim()};
+  const payload={id:editingId||undefined,item_code:$('ntec-ref-price-code').value.trim(),item_name:$('ntec-ref-price-name').value.trim(),section_name:$('ntec-ref-price-section').value.trim(),category:$('ntec-ref-price-category').value.trim(),unit:$('ntec-ref-price-unit').value.trim(),reference_price:Number($('ntec-ref-price-value').value),price_label:$('ntec-ref-price-label').value.trim(),notes:$('ntec-ref-price-notes').value.trim()};
   if(!payload.item_name||!payload.category||!payload.unit||$('ntec-ref-price-value').value===''||!Number.isFinite(payload.reference_price)||payload.reference_price<0){setMsg('Preencha item, categoria, unidade e um valor válido.',true);return}
   busy=true;$('ntec-ref-price-save').disabled=true;setMsg('Salvando valor de referência…');
   try{
@@ -758,7 +759,7 @@ if not _closing:
     raise SystemExit("script do módulo de programação: final do documento não encontrado")
 s = s[:_closing.start()] + reference_values_runtime + "\n" + runtime + "\n" + request_intake_runtime + "\n" + s[_closing.start():]
 
-for token in ["page-programacao","ntec-pg-body","loadProgrammingData","saveProgrammingItem","data-page=\"programacao\"","proposal_reference_values","loadProposalReferenceValues","saveProposalReferenceValue","ntec-ref-price-panel"]:
+for token in ["page-programacao","ntec-pg-body","loadProgrammingData","saveProgrammingItem","data-page=\"programacao\"","proposal_reference_values","loadProposalReferenceValues","saveProposalReferenceValue","ntec-ref-price-panel","item_code","section_name","source_sheet_order","ntec-ref-price-category-filter"]:
     if token not in s:
         raise SystemExit("Validação do módulo de programação falhou: " + token)
 
