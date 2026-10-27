@@ -306,15 +306,42 @@ async function createRuptureRevision(reportId){
   alert('Revisão '+String(nextNumber).padStart(2,'0')+' criada como rascunho: '+(created?ntecReportDisplayNumber(created):'aguardando atualização da lista')+'. Confira os dados e autorize antes de emitir.');
  }catch(err){alert('Não foi possível criar a revisão: '+(err?.message||'erro desconhecido'));if(button){button.disabled=false;button.textContent='Criar revisão';}}
 }
+function ntecReportIsCompleted(report){
+ const status=String(report?.status||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[ -]+/g,'_');
+ return ['emitido','concluido','finalizado','aprovado','issued','completed','final'].includes(status);
+}
+function ntecEnsureReportSections(){
+ const body=document.getElementById('reportsbody');if(!body)return;
+ const table=body.closest('table');if(!table)return;
+ let nav=document.getElementById('ntec-report-sections');
+ if(!nav){
+  nav=document.createElement('div');nav.id='ntec-report-sections';
+  nav.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;padding:10px;background:#f3f6fa;border:1px solid #dce4ed;border-radius:10px';
+  nav.innerHTML='<button type="button" data-report-view="active" class="btn primary">Em andamento</button><button type="button" data-report-view="completed" class="btn">Concluídos / emitidos</button><span id="ntec-report-view-counts" style="align-self:center;margin-left:auto;color:#64748b;font-size:12px"></span>';
+  table.parentNode.insertBefore(nav,table);
+  nav.querySelectorAll('[data-report-view]').forEach(button=>button.addEventListener('click',()=>{
+   window.ntecReportsView=button.dataset.reportView;
+   nav.querySelectorAll('[data-report-view]').forEach(b=>{b.classList.toggle('primary',b===button);});
+   renderReports();
+  }));
+ }
+ const active=reports.filter(r=>!ntecReportIsCompleted(r)).length,completed=reports.length-active;
+ const counts=nav.querySelector('#ntec-report-view-counts');if(counts)counts.textContent=active+' em andamento · '+completed+' concluídos/emitidos';
+ const view=window.ntecReportsView||'active';
+ nav.querySelectorAll('[data-report-view]').forEach(b=>b.classList.toggle('primary',b.dataset.reportView===view));
+}
 function renderReports(){
+ ntecEnsureReportSections();
  const body=document.getElementById('reportsbody');
- body.innerHTML=reports.length?reports.map(r=>{
+ const view=window.ntecReportsView||'active';
+ const visibleReports=reports.filter(r=>view==='completed'?ntecReportIsCompleted(r):!ntecReportIsCompleted(r));
+ body.innerHTML=visibleReports.length?visibleReports.map(r=>{
   const ruptureButton=r.report_type==='ruptura_concreto'?'<button class="btn secondary" data-rp-report="'+esc(r.id)+'">'+(ntecRuptureMeasurementCount(r)?'Atualizar rupturas':'Lançar ruptura')+'</button> ':'';
   const revisionNumber=Number(r.structured_data?.revision?.number||r.structured_data?.fields?.report_revision_number||0);
   const priorRevision=revisionNumber===0?ntecExistingRevisionFor(r):null;
   const revisionButton=revisionNumber>0?'<span class="muted small">Revisão '+String(revisionNumber).padStart(2,'0')+'</span> ':priorRevision?'<span class="muted small">Revisão já criada</span> ':'<button class="btn secondary" data-rp-revision="'+esc(r.id)+'">Criar revisão</button> ';
   const displayType=r.report_type==='ruptura_concreto'?'Relatório de moldagem':(r.typeLabel||r.report_type);return '<tr><td><strong>'+esc(ntecReportDisplayNumber(r))+'</strong><div>'+esc(r.title)+'</div>'+'<div class="muted small">'+esc(r.normative_references?'Referências registradas':'Referências pendentes')+'</div></td><td>'+esc(r.client)+'<div class="muted small">'+esc(r.project)+'</div></td><td>'+esc(displayType)+'</td><td>'+esc(r.report_date||'—')+'</td><td>'+badge(ntecReportStatusText(r))+'</td><td>'+ruptureButton+revisionButton+'<button class="btn" data-rp-edit="'+esc(r.id)+'">Editar</button> <button class="btn" data-rp-pdf="'+esc(r.id)+'">PDF</button></td></tr>';
- }).join(''):'<tr><td colspan="6" class="empty">Nenhum relatório técnico cadastrado no banco.</td></tr>';
+  }).join(''):'<tr><td colspan="6" class="empty">'+(view==='completed'?'Nenhum relatório concluído ou emitido nesta seção.':'Nenhum relatório em andamento nesta seção.')+'</td></tr>';
  body.querySelectorAll('[data-rp-report]').forEach(button=>button.addEventListener('click',()=>openRuptureEntry(button.dataset.rpReport)));
  body.querySelectorAll('[data-rp-revision]').forEach(button=>button.addEventListener('click',()=>createRuptureRevision(button.dataset.rpRevision)));
  body.querySelectorAll('[data-rp-edit]').forEach(button=>button.addEventListener('click',()=>editReport(button.dataset.rpEdit)));
