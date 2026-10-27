@@ -206,6 +206,14 @@ function openRuptureEntry(reportId){
   saveBtn.disabled=true;finishBtn.disabled=true;status.textContent='Salvando os resultados…';
   try{
    await window.NTEC_SUPABASE.updateReportResults(report.id,{structuredData:updated,results:resultText,status:nextStatus});
+   if(window.NTEC_SUPABASE.syncProgrammingRuptures){
+    const measuredByAge={};
+    entries.forEach(entry=>{
+     const age=ntecRuptureParseNumber(entry.age),load=ntecRuptureParseNumber(entry.load),resistance=ntecRuptureParseNumber(entry.resistance);
+     if(Number.isFinite(age)&&load>0&&resistance>0)measuredByAge[age]=(measuredByAge[age]||0)+1;
+    });
+    await window.NTEC_SUPABASE.syncProgrammingRuptures(report.id,measuredByAge,finish);
+   }
    reports=await window.NTEC_SUPABASE.loadReports();renderReports();
    status.textContent='Resultados salvos. '+resultText;setTimeout(close,700);
   }catch(err){status.textContent='Não foi possível salvar: '+(err?.message||'erro desconhecido');}
