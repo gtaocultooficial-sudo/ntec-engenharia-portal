@@ -328,6 +328,9 @@ runtime = r'''<script>
     proposal_id:proposalId,project_id:projectId,service_mode:mode,staff_count:staff,
     service_start_date:start,service_end_date:end,work_weekdays:weekdays
    });
+   const proposalAction=[...document.querySelectorAll('#propsbody [data-pg-review-existing]')].find(el=>String(el.dataset.pgReviewExisting)===String(proposalId));
+   const proposalRow=proposalAction?.closest('tr');
+   if(proposalRow){if(proposalRow.children[5])proposalRow.children[5].textContent='Aprovada';if(proposalAction){proposalAction.textContent='Programação criada';proposalAction.disabled=true;}}
    $('ntec-pg-proposal-review').classList.add('hidden');
    loaded=false;await loadData(true);
    message('Proposta '+(result.proposal?.proposal_number||'')+' aprovada. '+result.scheduledCount+' atividade(s) criada(s) na programação.');
