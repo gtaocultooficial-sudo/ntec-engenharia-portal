@@ -312,7 +312,7 @@ function ntecNormalizeReportStatus(value){
 function ntecReportIsCompleted(report){
  const candidates=[report?.status,report?.statusLabel,report?.status_label,report?.statusText,report?.status_text];
  const statuses=candidates.map(ntecNormalizeReportStatus).filter(Boolean);
- return statuses.some(status=>/(^|_)(emitido|emitida|concluido|concluida|finalizado|finalizada|aprovado|aprovada|issued|completed|complete|final)(_|$)/.test(status));
+ return statuses.some(status=>/(^|_)(emitido|emitida|publicado|publicada|concluido|concluida|finalizado|finalizada|issued|published|completed|complete|final)(_|$)/.test(status));
 }
 function ntecEnsureReportSections(){
  if(!window.ntecReportsView)window.ntecReportsView='active';
