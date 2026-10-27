@@ -758,7 +758,7 @@ if not _closing:
     raise SystemExit("script do módulo de programação: final do documento não encontrado")
 s = s[:_closing.start()] + reference_values_runtime + "\n" + runtime + "\n" + request_intake_runtime + "\n" + s[_closing.start():]
 
-for token in ["page-programacao","ntec-pg-body","loadProgrammingData","saveProgrammingItem","data-page=\"programacao\"","proposal_reference_values","loadProposalReferenceValues","saveProposalReferenceValue","Valores de Referência para Proposta"]:
+for token in ["page-programacao","ntec-pg-body","loadProgrammingData","saveProgrammingItem","data-page=\"programacao\"","proposal_reference_values","loadProposalReferenceValues","saveProposalReferenceValue","ntec-ref-price-panel"]:
     if token not in s:
         raise SystemExit("Validação do módulo de programação falhou: " + token)
 
