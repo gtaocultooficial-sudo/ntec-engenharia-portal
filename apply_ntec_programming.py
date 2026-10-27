@@ -60,10 +60,15 @@ async approveProposalAndSchedule(payload){
   }
  }else{
   const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
-   if(payload.service_mode==='diaria'&&!weekdays.includes(d.getDay()===0?7:d.getDay()))continue;
-   const date=iso(d),key=proposal.id+':'+payload.service_mode+':'+date;
-   rows.push(makeRow(date,date,key,baseTitle+' — '+(proposal.proposal_number||'Proposta'),staff,payload.service_mode==='diaria'?'funcionário/diária':'atendimento','Atividade criada a partir da proposta '+(proposal.proposal_number||proposal.id)+'. É uma programação prevista, não um registro de serviço executado. Escopo: '+description));
+  if(payload.service_mode==='pontual'){
+   const date=iso(start),endDate=iso(end),key=proposal.id+':pontual:'+date+':'+endDate;
+   rows.push(makeRow(date,endDate,key,baseTitle+' — '+(proposal.proposal_number||'Proposta'),staff,'atendimento','Atividade pontual criada a partir da proposta '+(proposal.proposal_number||proposal.id)+'. Confirme data e escopo antes da execução. Escopo: '+description));
+  }else{
+   for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+    if(!weekdays.includes(d.getDay()===0?7:d.getDay()))continue;
+    const date=iso(d),key=proposal.id+':diaria:'+date;
+    rows.push(makeRow(date,date,key,baseTitle+' — '+(proposal.proposal_number||'Proposta'),staff,'funcionário/diária','Atividade diária criada a partir da proposta '+(proposal.proposal_number||proposal.id)+'. É uma programação prevista, não um registro de serviço executado. Escopo: '+description));
+   }
   }
  }
  if(!rows.length)throw new Error('Nenhuma atividade foi gerada. Revise período e dias selecionados.');
