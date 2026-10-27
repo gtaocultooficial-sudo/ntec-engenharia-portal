@@ -235,6 +235,33 @@ runtime = r'''<script>
    return '<tr><td><strong>'+esc(p.proposal_number||'Proposta sem número')+'</strong><span class="ntec-pg-sub">'+esc(client)+'</span>'+(project?'<span class="ntec-pg-sub">'+esc(project.name)+'</span>':'<span class="ntec-pg-sub">Obra ainda não vinculada</span>')+'</td><td>'+esc(p.description||'Escopo não informado')+'</td><td><span class="ntec-pg-tag">'+esc(serviceModeLabel[mode]||mode)+'</span></td><td>'+esc(status)+'</td><td><button type="button" class="btn primary" data-pg-review-proposal="'+esc(p.id)+'">'+action+'</button></td></tr>';
   }).join(''):'<tr><td colspan="5" class="empty">Nenhuma proposta aguardando programação. Propostas recusadas/expiradas não aparecem; propostas já programadas ficam registradas na lista de atividades.</td></tr>';
   body.querySelectorAll('[data-pg-review-proposal]').forEach(button=>button.addEventListener('click',()=>openProposalReview(button.dataset.pgReviewProposal)));
+  injectProposalActions();
+ }
+ function injectProposalActions(){
+  const body=$('propsbody');if(!body)return;
+  const table=body.closest('table'),header=table?.querySelector('thead tr');
+  if(!table||!header)return;
+  if(!header.querySelector('[data-pg-proposal-action-heading]')){
+   const th=document.createElement('th');th.dataset.pgProposalActionHeading='1';th.textContent='Programação';header.appendChild(th);
+  }
+  for(const row of [...body.querySelectorAll('tr')]){
+   if(row.querySelector('td[colspan]')||row.querySelector('[data-pg-review-existing]'))continue;
+   const text=row.textContent||'';
+   const proposal=data.proposals.find(p=>p.proposal_number&&text.includes(p.proposal_number));
+   if(!proposal)continue;
+   const cell=document.createElement('td'),button=document.createElement('button');
+   button.type='button';button.className='btn'+(proposal.programming_generated_at?'':' primary');
+   button.dataset.pgReviewExisting=proposal.id;
+   button.textContent=proposal.programming_generated_at?'Programação criada':proposal.status==='aprovada'?'Programar já aprovada':'Analisar e fechar';
+   button.disabled=Boolean(proposal.programming_generated_at);
+   button.addEventListener('click',()=>openProposalReviewFromExisting(proposal.id));
+   cell.appendChild(button);row.appendChild(cell);
+  }
+  body.querySelectorAll('td[colspan]').forEach(td=>{td.colSpan=header.querySelectorAll('th').length});
+ }
+ function openProposalReviewFromExisting(id){
+  if(typeof showPage==='function')showPage('programacao');
+  openProposalReview(id);
  }
  function localToday(){
   const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -432,6 +459,10 @@ runtime = r'''<script>
   if(!window.NTEC_SUPABASE)return;
   const nav=document.querySelector('#nav [data-page="programacao"]');
   nav?.addEventListener('click',()=>loadData(false));
+  const proposalsNav=document.querySelector('#nav [data-page="propostas"]');
+  proposalsNav?.addEventListener('click',()=>loadData(false));
+  const proposalsBody=$('propsbody');
+  if(proposalsBody&&typeof MutationObserver!=='undefined')new MutationObserver(()=>injectProposalActions()).observe(proposalsBody,{childList:true,subtree:true});
   $('ntec-pg-new')?.addEventListener('click',()=>{$('ntec-pg-form').classList.remove('hidden');resetForm();$('ntec-pg-form').classList.remove('hidden');$('ntec-pg-title').focus()});
   $('ntec-pg-cancel')?.addEventListener('click',resetForm);
   $('ntec-pg-save')?.addEventListener('click',saveItem);
