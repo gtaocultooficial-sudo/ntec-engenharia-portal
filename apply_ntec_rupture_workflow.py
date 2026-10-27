@@ -4,7 +4,7 @@ import re, sys
 
 path = Path(sys.argv[1] if len(sys.argv) > 1 else "_site/admin/index.html")
 s = path.read_text(encoding="utf-8")
-s = s.replace("Portal NTEC · v17", "Portal NTEC · v18")
+s = s.replace("Portal NTEC · v17", "Portal NTEC · v19")
 
 def once(old, new, label):
     global s
@@ -306,29 +306,31 @@ async function createRuptureRevision(reportId){
   alert('Revisão '+String(nextNumber).padStart(2,'0')+' criada como rascunho: '+(created?ntecReportDisplayNumber(created):'aguardando atualização da lista')+'. Confira os dados e autorize antes de emitir.');
  }catch(err){alert('Não foi possível criar a revisão: '+(err?.message||'erro desconhecido'));if(button){button.disabled=false;button.textContent='Criar revisão';}}
 }
+function ntecNormalizeReportStatus(value){
+ return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+}
 function ntecReportIsCompleted(report){
- const status=String(report?.status||'').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[ -]+/g,'_');
- return ['emitido','concluido','finalizado','aprovado','issued','completed','final'].includes(status);
+ const candidates=[report?.status,report?.statusLabel,report?.status_label,report?.statusText,report?.status_text];
+ const statuses=candidates.map(ntecNormalizeReportStatus).filter(Boolean);
+ return statuses.some(status=>/^(emitido|emitida|concluido|concluida|finalizado|finalizada|aprovado|aprovada|issued|completed|complete|final)$/.test(status));
 }
 function ntecEnsureReportSections(){
- const body=document.getElementById('reportsbody');if(!body)return;
- const table=body.closest('table');if(!table)return;
- let nav=document.getElementById('ntec-report-sections');
- if(!nav){
-  nav=document.createElement('div');nav.id='ntec-report-sections';
-  nav.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px;padding:10px;background:#f3f6fa;border:1px solid #dce4ed;border-radius:10px';
-  nav.innerHTML='<button type="button" data-report-view="active" class="btn primary">Em andamento</button><button type="button" data-report-view="completed" class="btn">Concluídos / emitidos</button><span id="ntec-report-view-counts" style="align-self:center;margin-left:auto;color:#64748b;font-size:12px"></span>';
-  table.parentNode.insertBefore(nav,table);
-  nav.querySelectorAll('[data-report-view]').forEach(button=>button.addEventListener('click',()=>{
-   window.ntecReportsView=button.dataset.reportView;
-   nav.querySelectorAll('[data-report-view]').forEach(b=>{b.classList.toggle('primary',b===button);});
+ if(!window.ntecReportsView)window.ntecReportsView='active';
+ const controls=[...document.querySelectorAll('button,a,[role="tab"],[data-tab]')].filter(el=>!el.closest('#reportsbody'));
+ for(const el of controls){
+  if(el.dataset.ntecReportViewBound==='1')continue;
+  const label=ntecNormalizeReportStatus(el.textContent);
+  let view='';
+  if(label.includes('em_andamento'))view='active';
+  else if(label.includes('concluido')||label.includes('concluida')||label.includes('emitido')||label.includes('emitida'))view='completed';
+  if(!view)continue;
+  el.dataset.ntecReportViewBound='1';
+  el.dataset.ntecReportView=view;
+  el.addEventListener('click',()=>{
+   window.ntecReportsView=view;
    renderReports();
-  }));
+  });
  }
- const active=reports.filter(r=>!ntecReportIsCompleted(r)).length,completed=reports.length-active;
- const counts=nav.querySelector('#ntec-report-view-counts');if(counts)counts.textContent=active+' em andamento · '+completed+' concluídos/emitidos';
- const view=window.ntecReportsView||'active';
- nav.querySelectorAll('[data-report-view]').forEach(b=>b.classList.toggle('primary',b.dataset.reportView===view));
 }
 function renderReports(){
  ntecEnsureReportSections();
