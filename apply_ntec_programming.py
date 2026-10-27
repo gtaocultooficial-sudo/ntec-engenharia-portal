@@ -42,6 +42,19 @@ async deleteProgrammingItem(id){
  if(error)throw error;
  return true;
 },
+async syncProgrammingRuptures(reportId,measuredByAge,reportComplete=false){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ const {data:items,error}=await supabase.from('programming_items').select('id,test_age_days,quantity,status').eq('report_id',reportId).eq('item_type','ruptura').neq('status','cancelado');
+ if(error)throw error;
+ for(const item of items||[]){
+  const age=Number(item.test_age_days),measured=Math.max(0,Number(measuredByAge?.[age]||0)),required=Math.max(0,Number(item.quantity||0));
+  const complete=measured>0&&(required>0?measured>=required:Boolean(reportComplete));
+  const status=complete?'concluido':measured>0?'em_andamento':'agendado';
+  const {error:updateError}=await supabase.from('programming_items').update({status,updated_at:new Date().toISOString()}).eq('id',item.id);
+  if(updateError)throw updateError;
+ }
+ return true;
+},
 getProgrammingAccess(){return Boolean(currentSession&&currentProfile?.role==='admin');},
 """
 once("async saveReport(r){", api_methods + "async saveReport(r){", "API do módulo de programação")
