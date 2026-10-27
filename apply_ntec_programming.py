@@ -126,6 +126,52 @@ async loadProposalIntake(){
  const proposals=linked.map(p=>({...p,items:groupedItems.get(p.id)||[]}));
  return {requests:(requestsResult.data||[]).map(r=>({...r,linked_proposal:proposals.find(p=>p.source_request_id===r.id)||null})),projects:projectsResult.data||[],proposals};
 },
+async loadProposalPricing(){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ const [proposalResult,itemResult]=await Promise.all([
+  supabase.from('proposals').select('id,proposal_number,client_id,project_id,description,amount,status,valid_until,service_mode,staff_count,created_at,clients(company_name,contact_name,email,phone),projects(name,address,work_number,clients(company_name))').order('created_at',{ascending:false}),
+  supabase.from('proposal_items').select('id,proposal_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total').order('item_number',{ascending:true})
+ ]);
+ if(proposalResult.error)throw proposalResult.error;
+ if(itemResult.error)throw itemResult.error;
+ const byProposal=new Map();
+ for(const item of itemResult.data||[]){if(!byProposal.has(item.proposal_id))byProposal.set(item.proposal_id,[]);byProposal.get(item.proposal_id).push(item);}
+ return (proposalResult.data||[]).map(p=>({...p,items:byProposal.get(p.id)||[]}));
+},
+async saveProposalPricing(payload){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ if(!payload?.proposal_id)throw new Error('Selecione a proposta para salvar o demonstrativo.');
+ if(!Array.isArray(payload.items))throw new Error('A composição de itens está inválida.');
+ const {data:proposal,error:proposalError}=await supabase.from('proposals').select('id,status').eq('id',payload.proposal_id).single();
+ if(proposalError)throw proposalError;
+ if(!['rascunho','em_revisao'].includes(proposal.status))throw new Error('A proposta não está em rascunho ou revisão; abra somente para leitura.');
+ const items=payload.items.map((item,index)=>{
+  const description=String(item.description||'').trim(),unit=String(item.unit||'').trim();
+  const quantity=Number(item.quantity),unit_price=Number(item.unit_price),discount_percent=Number(item.discount_percent||0);
+  if(!description||description.length>500)throw new Error('Informe uma descrição válida no item '+(index+1)+'.');
+  if(!unit||unit.length>40)throw new Error('Informe a unidade do item '+(index+1)+'.');
+  if(!Number.isFinite(quantity)||quantity<=0)throw new Error('A quantidade do item '+(index+1)+' deve ser maior que zero.');
+  if(!Number.isFinite(unit_price)||unit_price<0)throw new Error('Preço unitário inválido no item '+(index+1)+'.');
+  if(!Number.isFinite(discount_percent)||discount_percent<0||discount_percent>100)throw new Error('Desconto inválido no item '+(index+1)+'.');
+  const gross=Math.round(quantity*unit_price*100)/100;
+  const line_total=Math.round(gross*(1-discount_percent/100)*100)/100;
+  return {id:item.id||undefined,proposal_id:payload.proposal_id,item_number:index+1,description,quantity,unit,unit_price,discount_percent,line_total,updated_at:new Date().toISOString()};
+ });
+ const total=Math.round(items.reduce((sum,item)=>sum+item.line_total,0)*100)/100;
+ const {data:existing,error:existingError}=await supabase.from('proposal_items').select('id').eq('proposal_id',payload.proposal_id);
+ if(existingError)throw existingError;
+ const saved=[];
+ if(items.length){
+  const {data,error}=await supabase.from('proposal_items').upsert(items,{onConflict:'id'}).select('id,proposal_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total');
+  if(error)throw error;
+  saved.push(...(data||[]));
+ }
+ const keep=new Set(saved.map(x=>x.id));
+ for(const old of (existing||[])){if(!keep.has(old.id)){const {error}=await supabase.from('proposal_items').delete().eq('id',old.id);if(error)throw error;}}
+ const {data:updated,error:updateError}=await supabase.from('proposals').update({amount:total}).eq('id',payload.proposal_id).select('id,proposal_number,amount,status').single();
+ if(updateError)throw updateError;
+ return {proposal:updated,items:saved.sort((a,b)=>a.item_number-b.item_number),total};
+},
 async updateProposalRequestStatus(id,status){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
  if(!['recebida','em_atendimento','proposta_criada','encerrada'].includes(status))throw new Error('Status de solicitação inválido.');
@@ -200,7 +246,7 @@ getProgrammingAccess(){return Boolean(currentSession&&currentProfile?.role==='ad
 once("async saveReport(r){", api_methods + "async saveReport(r){", "API do módulo de programação")
 
 nav_anchor = '<button data-page="propostas">▤ <span>Propostas</span></button><button data-page="medicoes">▧ <span>Medições</span></button>'
-nav_new = '<button data-page="propostas">▤ <span>Propostas</span></button><button data-page="programacao">▦ <span>Programação</span></button><button data-page="medicoes">▧ <span>Medições</span></button>'
+nav_new = nav_new.replace('<button data-page="programacao">▦ <span>Programação</span></button>', '<button data-page="programacao">▦ <span>Programação</span></button><button data-page="demonstrativo-precos">▧ <span>Demonstrativo de preços</span></button>')
 once(nav_anchor, nav_new, "navegação da programação")
 
 section = r'''<section class="page hidden" id="page-programacao">
