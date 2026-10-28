@@ -122,7 +122,11 @@ runtime = r'''<script>
  function renderOptions(keepId){
   const select=$('ntec-ai-item');if(!select)return;
   const active=rows.filter(r=>r.is_active);
-  select.innerHTML='<option value="">Selecione um item cadastrado…</option>'+active.map(r=>'<option value="'+esc(r.id)+'">'+esc((r.item_code?r.item_code+' · ':'')+r.item_name+' — '+r.category+' ('+r.unit+')'+(r.normative_references?' — '+r.normative_references:'')+(r.price_label?' ['+r.price_label+']':''))+'</option>').join('');
+  select.innerHTML='<option value="">Selecione um item cadastrado…</option>'+active.map(r=>{
+   const codes=String(r.normative_references||'').match(/(?:ABNT\\s+)?NBR\\s+\\d+(?::\\d{4})?|DNER-PRO\\s+\\d+\\/\\d{2,4}/gi)||[];
+   const normLabel=[...new Set(codes.map(n=>n.replace(/^NBR/i,'ABNT NBR').toUpperCase()))].slice(0,3).join(' / ')||'Norma a confirmar conforme escopo';
+   return '<option value="'+esc(r.id)+'">'+esc('['+normLabel+'] '+(r.item_code?r.item_code+' · ':'')+r.item_name+' — '+r.category+' ('+r.unit+')'+(r.price_label?' ['+r.price_label+']':''))+'</option>';
+  }).join('');
   if(keepId&&active.some(r=>String(r.id)===String(keepId)))select.value=keepId;
  }
  async function loadRefs(){
