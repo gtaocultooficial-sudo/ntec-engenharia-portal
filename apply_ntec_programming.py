@@ -117,7 +117,7 @@ async loadProposalIntake(){
   supabase.from('proposal_requests').select('id,full_name,company_name,email,phone,service,project_location,details,consent_to_contact,status,created_at').order('created_at',{ascending:false}),
   supabase.from('projects').select('id,name,client_id,work_number,status,clients(company_name)').order('created_at',{ascending:false}),
   supabase.from('proposals').select('id,proposal_number,source_request_id,status,amount,valid_until,description,created_at,client_id,project_id,service_mode,staff_count,clients(company_name,contact_name,email,phone),projects(name,address,work_number,clients(company_name))').order('created_at',{ascending:false}),
-  supabase.from('proposal_items').select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note').order('item_number',{ascending:true})
+  supabase.from('proposal_items').select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note,scope_accreditation_status').order('item_number',{ascending:true})
  ]);
  for(const result of [requestsResult,projectsResult,proposalsResult,itemsResult])if(result.error)throw result.error;
  const linked=proposalsResult.data||[];
@@ -130,7 +130,7 @@ async loadProposalPricing(){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
  const [proposalResult,itemResult]=await Promise.all([
   supabase.from('proposals').select('id,proposal_number,client_id,project_id,description,amount,status,valid_until,service_mode,staff_count,created_at,clients(company_name,contact_name,email,phone),projects(name,address,work_number,clients(company_name))').order('created_at',{ascending:false}),
-  supabase.from('proposal_items').select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note').order('item_number',{ascending:true})
+  supabase.from('proposal_items').select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note,scope_accreditation_status').order('item_number',{ascending:true})
  ]);
  if(proposalResult.error)throw proposalResult.error;
  if(itemResult.error)throw itemResult.error;
@@ -155,14 +155,14 @@ async saveProposalPricing(payload){
   if(!Number.isFinite(discount_percent)||discount_percent<0||discount_percent>100)throw new Error('Desconto inválido no item '+(index+1)+'.');
   const gross=Math.round(quantity*unit_price*100)/100;
   const line_total=Math.round(gross*(1-discount_percent/100)*100)/100;
-  return {id:item.id||undefined,proposal_id:payload.proposal_id,reference_value_id:item.reference_value_id||null,item_number:index+1,description,quantity,unit,unit_price,discount_percent,line_total,normative_references:String(item.normative_references||'').slice(0,1800),normative_note:String(item.normative_note||'').slice(0,1800),updated_at:new Date().toISOString()};
+  return {id:item.id||undefined,proposal_id:payload.proposal_id,reference_value_id:item.reference_value_id||null,item_number:index+1,description,quantity,unit,unit_price,discount_percent,line_total,normative_references:String(item.normative_references||'').slice(0,1800),normative_note:String(item.normative_note||'').slice(0,1800),scope_accreditation_status:String(item.scope_accreditation_status||'').slice(0,80),updated_at:new Date().toISOString()};
  });
  const total=Math.round(items.reduce((sum,item)=>sum+item.line_total,0)*100)/100;
  const {data:existing,error:existingError}=await supabase.from('proposal_items').select('id').eq('proposal_id',payload.proposal_id);
  if(existingError)throw existingError;
  const saved=[];
  if(items.length){
-  const {data,error}=await supabase.from('proposal_items').upsert(items,{onConflict:'id'}).select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note');
+  const {data,error}=await supabase.from('proposal_items').upsert(items,{onConflict:'id'}).select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note,scope_accreditation_status');
   if(error)throw error;
   saved.push(...(data||[]));
  }
@@ -174,7 +174,7 @@ async saveProposalPricing(payload){
 },
 async loadProposalReferenceValues(){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
- const {data,error}=await supabase.from('proposal_reference_values').select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').order('source_sheet_order',{ascending:true}).order('source_row',{ascending:true}).order('item_code',{ascending:true});
+ const {data,error}=await supabase.from('proposal_reference_values').select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,scope_accreditation_status,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').order('source_sheet_order',{ascending:true}).order('source_row',{ascending:true}).order('item_code',{ascending:true});
  if(error)throw error;
  return data||[];
 },
@@ -187,8 +187,8 @@ async saveProposalReferenceValue(payload){
  if(!Number.isFinite(reference_price)||reference_price<0)throw new Error('Informe um valor de referência válido.');
  const row={item_name,item_code,section_name,category,unit,reference_price,price_label,notes:String(payload?.notes||'').trim(),updated_at:new Date().toISOString()};
  let result;
- if(payload.id)result=await supabase.from('proposal_reference_values').update(row).eq('id',payload.id).select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').single();
- else result=await supabase.from('proposal_reference_values').insert({...row,is_active:true}).select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').single();
+ if(payload.id)result=await supabase.from('proposal_reference_values').update(row).eq('id',payload.id).select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,scope_accreditation_status,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').single();
+ else result=await supabase.from('proposal_reference_values').insert({...row,is_active:true}).select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,scope_accreditation_status,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').single();
  if(result.error)throw result.error;
  return result.data;
 },
@@ -256,7 +256,7 @@ async createDraftProposalFromRequest(payload){
  const createdProposal=await supabase.from('proposals').insert(proposalPayload).select('id,proposal_number,status,amount,source_request_id,client_id,project_id,description,valid_until,service_mode,staff_count,created_at').single();
  if(createdProposal.error)throw createdProposal.error;
  const itemsToSave=normalizedItems.map(item=>({...item,proposal_id:createdProposal.data.id}));
- const savedItems=await supabase.from('proposal_items').insert(itemsToSave).select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note');
+ const savedItems=await supabase.from('proposal_items').insert(itemsToSave).select('id,proposal_id,reference_value_id,item_number,description,quantity,unit,unit_price,discount_percent,line_total,normative_references,normative_note,scope_accreditation_status');
  if(savedItems.error){
   await supabase.from('proposals').delete().eq('id',createdProposal.data.id);
   throw new Error('Não foi possível salvar a composição de preços; a proposta não foi mantida: '+savedItems.error.message);
