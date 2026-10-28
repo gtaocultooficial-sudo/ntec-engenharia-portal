@@ -374,14 +374,16 @@ reference_values_runtime = r'''<script>
   if(existing)return existing;
   // The original portal did not include this heading. Mount the reference table
   // inside the existing Propostas comerciais page, not in a new navigation tab.
-  const proposals=[...document.querySelectorAll('h1')].find(el=>norm(el.textContent)==='propostas comerciais');
-  if(!proposals)return null;
-  const section=proposals.closest('section');if(!section)return null;
+  const proposals=[...document.querySelectorAll('h1')].find(el=>norm(el.textContent).includes('propostas comerciais'));
+  const fallbackSection=[...document.querySelectorAll('section')].find(sec=>norm(sec.textContent).includes('propostas comerciais')&&sec.querySelector('h1'));
+  const proposalHeading=proposals||(fallbackSection&&fallbackSection.querySelector('h1'));
+  if(!proposalHeading)return null;
+  const section=proposalHeading.closest('section');if(!section)return null;
   let heading=section.querySelector('#ntec-ref-price-heading');
   if(heading)return heading;
   heading=document.createElement('h2');heading.id='ntec-ref-price-heading';heading.textContent='Valores de Referência para Proposta';
   heading.style.marginTop='24px';
-  const intro=proposals.nextElementSibling&&proposals.nextElementSibling.tagName==='P'?proposals.nextElementSibling:proposals;
+  const intro=proposalHeading.nextElementSibling&&proposalHeading.nextElementSibling.tagName==='P'?proposalHeading.nextElementSibling:proposalHeading;
   intro.insertAdjacentElement('afterend',heading);
   return heading;
  }
