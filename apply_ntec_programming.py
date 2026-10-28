@@ -172,6 +172,12 @@ async saveProposalPricing(payload){
  if(updateError)throw updateError;
  return {proposal:updated,items:saved.sort((a,b)=>a.item_number-b.item_number),total};
 },
+async loadNtecLabScope(){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ const {data,error}=await supabase.from('ntec_lab_scope').select('id,activity_area,test_description,standard_procedure,accreditation_status,scope_notes,sort_order').order('sort_order',{ascending:true}).order('activity_area',{ascending:true});
+ if(error)throw error;
+ return data||[];
+},
 async loadProposalReferenceValues(){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
  const {data,error}=await supabase.from('proposal_reference_values').select('id,item_code,section_name,item_name,category,unit,reference_price,price_label,notes,normative_references,normative_note,scope_accreditation_status,is_active,source_row,source_sheet_order,source_reference,created_at,updated_at').order('source_sheet_order',{ascending:true}).order('source_row',{ascending:true}).order('item_code',{ascending:true});
