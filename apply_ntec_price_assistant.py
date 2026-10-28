@@ -187,6 +187,7 @@ runtime = r'''<script>
  }
  async function requestAiEstimate(){
   if(busy||!selected)return;
+  if(selected.price_label||!Number.isFinite(Number(selected.reference_price))||Number(selected.reference_price)<=0){msg('Antes da pesquisa de mercado, cadastre um preço-base numérico maior que zero para este item.',true);return}
   const button=$('ntec-ai-real-estimate');busy=true;button.disabled=true;button.textContent='Pesquisando…';msg('Consultando a IA e pesquisando referências públicas de mercado. Isso pode levar alguns instantes…');
   try{
    const result=await api().requestProposalPriceAI({item_name:selected.item_name,item_code:selected.item_code,category:selected.category,unit:selected.unit,current_price:Number(selected.reference_price||0),price_label:selected.price_label||'',notes:selected.notes||''});
@@ -218,6 +219,7 @@ runtime = r'''<script>
  }
  async function saveReview(){
   if(busy||!lastEstimate)return;
+  if(lastEstimate.assessment==='sem_preco_numerico'){msg('Esta revisão não pode ser salva como recomendação de preço: falta preço numérico.',true);return}
   busy=true;$('ntec-ai-save').disabled=true;msg('Salvando revisão no Supabase…');
   try{
    lastSavedReview=await api().saveProposalPriceReview(lastEstimate);
