@@ -193,16 +193,16 @@ runtime = r'''<script>
  }
  async function requestAiEstimate(){
   if(busy||!selected)return;
-  if(selected.price_label||!Number.isFinite(Number(selected.reference_price))||Number(selected.reference_price)<=0){msg('Antes da pesquisa de mercado, cadastre um preço-base numérico maior que zero para este item.',true);return}
+  // Pesquisa de mercado é válida mesmo sem preço-base numérico (ex.: item marcado como "Incluso").
   const button=$('ntec-ai-real-estimate');busy=true;button.disabled=true;button.textContent='Pesquisando…';msg('Consultando a IA e pesquisando referências públicas de mercado. Isso pode levar alguns instantes…');
   try{
    const result=await api().requestProposalPriceAI({item_name:selected.item_name,item_code:selected.item_code,category:selected.category,unit:selected.unit,current_price:Number(selected.reference_price||0),price_label:selected.price_label||'',notes:selected.notes||''});
    if(!result||!Number.isFinite(Number(result.recommended_price))||!Number.isFinite(Number(result.market_price_min))||!Number.isFinite(Number(result.market_price_max)))throw new Error('A IA retornou valores inválidos.');
    const min=Number(result.market_price_min),max=Number(result.market_price_max),recommended=Number(result.recommended_price);
-   const current=Number(selected.reference_price||0),assessment=result.assessment|| (current<min?'abaixo':current>max?'acima':'na_faixa');
+   const current=Number(selected.reference_price||0),assessment=(selected.price_label||current<=0)?'sem_preco_numerico':(result.assessment|| (current<min?'abaixo':current>max?'acima':'na_faixa'));
    const sources=Array.isArray(result.sources)?result.sources:[];
    const factors=Array.isArray(result.cost_factors)?result.cost_factors:[];
-   const noteLines=['Análise de mercado assistida por IA com pesquisa web.','Data da análise: '+(result.data_as_of||new Date().toISOString().slice(0,10)), 'Modelo: '+(result.model||'não informado'),'Confiança: '+(result.confidence||'não informada'),'Racional: '+(result.rationale||'não informado'), 'Fatores de custo: '+(factors.join('; ')||'não informados'), 'Fontes consultadas: '+(sources.map(x=>(x.title||x.url)+' — '+x.url+(x.summary?' — '+x.summary:'')).join(' | ')||'Nenhuma fonte listada pela IA'),'Aviso: estimativa indicativa; confira escopo, unidade, impostos, deslocamento, equipamento, equipe e margem antes de aplicar.'];
+   const noteLines=['Análise de mercado assistida por IA com pesquisa web.','Data da análise: '+(result.data_as_of||new Date().toISOString().slice(0,10)), 'Preço-base NTEC: '+(selected.price_label||money(current)),'Modelo: '+(result.model||'não informado'),'Confiança: '+(result.confidence||'não informada'),'Racional: '+(result.rationale||'não informado'), 'Fatores de custo: '+(factors.join('; ')||'não informados'), 'Fontes consultadas: '+(sources.map(x=>(x.title||x.url)+' — '+x.url+(x.summary?' — '+x.summary:'')).join(' | ')||'Nenhuma fonte listada pela IA'),'Aviso: estimativa indicativa; confira escopo, unidade, impostos, deslocamento, equipamento, equipe e margem antes de aplicar.'];
    const years=1;
    const band=Math.max(0,Math.min(50,Math.round((Math.max(recommended-min,max-recommended)/Math.max(recommended,1))*1000)/10));
    lastEstimate={reference_value_id:selected.id,item_name:selected.item_name,item_code:selected.item_code,category:selected.category,unit:selected.unit,base_price:current,recommended_price:Math.round(recommended*100)/100,market_price_min:Math.round(min*100)/100,market_price_max:Math.round(max*100)/100,annual_adjustment_percent:Number(result.annual_adjustment_percent),band_percent:band,index_name:'IA OpenAI + pesquisa web',index_period:result.data_as_of||new Date().toISOString().slice(0,10),years_elapsed:years,assessment,notes:noteLines.join('\n')};
@@ -211,7 +211,7 @@ runtime = r'''<script>
    const css=assessment==='abaixo'?'bad':assessment==='na_faixa'?'good':'';
    const sourceHtml=sources.length?sources.map(source=>'<li><a href="'+esc(source.url)+'" target="_blank" rel="noopener">'+esc(source.title||source.url)+'</a>'+(source.summary?'<div class="muted small">'+esc(source.summary)+'</div>':'')+'</li>').join(''):'<li>Nenhuma fonte verificável retornada. Use a estimativa apenas como triagem e confira os preços manualmente.</li>';
    $('ntec-ai-result').innerHTML='<div><span class="ntec-ai-status '+css+'">'+esc(label)+'</span> <span class="ntec-ai-tag">Confiança: '+esc(result.confidence||'não informada')+'</span></div><div class="metrics">'+
-   '<div class="metric"><span>Preço atual NTEC</span><strong>'+money(current)+'</strong></div>'+
+   '<div class="metric"><span>Preço atual NTEC</span><strong>'+(selected.price_label?esc(selected.price_label)+' <small>(sem preço numérico)</small>':money(current))+'</strong></div>'+
    '<div class="metric"><span>Recomendação da IA</span><strong>'+money(recommended)+'</strong></div>'+
    '<div class="metric"><span>Faixa estimada</span><strong>'+money(min)+' – '+money(max)+'</strong></div>'+
    '<div class="metric"><span>Reajuste anual sugerido</span><strong>'+Number(result.annual_adjustment_percent).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%</strong></div></div>'+
@@ -220,7 +220,15 @@ runtime = r'''<script>
    '<p><strong>Fontes da pesquisa:</strong></p><ul>'+sourceHtml+'</ul>'+
    '<p class="muted small">Estimativa de apoio à decisão, não cotação garantida. O preço oficial só muda após salvar a revisão e clicar em “Aplicar preço recomendado à tabela”.</p>';
    msg('Análise de IA pronta. Revise as fontes e salve a revisão para manter o histórico.');
-  }catch(e){msg('Não foi possível obter a análise da IA: '+(e?.message||'erro desconhecido'),true)}
+  }catch(e){
+   const reason=e?.message||'erro desconhecido';
+   const itemQuery=[selected?.item_name,selected?.category,'preço unitário mercado São Paulo Brasil'].filter(Boolean).join(' ');
+   const editalQuery=[selected?.item_name,selected?.category,'preço unitário edital licitação'].filter(Boolean).join(' ');
+   const google='https://www.google.com/search?q='+encodeURIComponent(itemQuery);
+   const editais='https://www.google.com/search?q='+encodeURIComponent(editalQuery);
+   $('ntec-ai-result').innerHTML='<p><strong>A pesquisa automática de mercado não foi concluída.</strong> Não há faixa de preço nem recomendação de mercado salva. Motivo: '+esc(reason)+'</p><p>Você pode abrir pesquisas públicas para este item enquanto a integração da IA é corrigida:</p><ul><li><a href="'+esc(google)+'" target="_blank" rel="noopener">Pesquisar preços do serviço na internet</a></li><li><a href="'+esc(editais)+'" target="_blank" rel="noopener">Pesquisar preços em editais e licitações</a></li></ul>';
+   msg('A pesquisa automática falhou; não foi usado reajuste por índice como substituto.',true);
+  }
   finally{busy=false;button.disabled=false;button.textContent='Pesquisar mercado com IA'}
  }
  async function saveReview(){
