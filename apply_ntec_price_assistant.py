@@ -17,7 +17,12 @@ def once(old, new, label):
 api_methods = r"""async requestProposalPriceAI(payload){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
  const {data,error}=await supabase.functions.invoke('ntec-price-ai',{body:payload});
- if(error)throw new Error(error.message||'Falha ao chamar a IA de precificação.');
+ if(error){
+  let detail=null;
+  try{const response=error.context;if(response&&typeof response.clone==='function')detail=await response.clone().json()}catch{}
+  if(detail?.error)throw new Error(String(detail.error)+(detail.detail?' — '+detail.detail:''));
+  throw new Error(error.message||'Falha ao chamar a IA de precificação.');
+ }
  if(data?.error)throw new Error(data.error+(data.detail?' — '+data.detail:''));
  if(!data?.estimate)throw new Error('A IA não retornou uma estimativa utilizável.');
  return data.estimate;
@@ -307,6 +312,12 @@ runtime = r'''<script>
   const box=document.createElement('div');box.id='ntec-composition-panel';box.className='panel';box.style.cssText='margin:22px 0;padding:16px';
   box.innerHTML='<div class="titleline"><div><h2>Demonstrativo de preços por item</h2><p class="sub">Monte a composição comercial da proposta com a tabela de referência. Ao selecionar um item, a unidade e o preço de referência são preenchidos; você pode ajustar antes de salvar.</p></div><button type="button" class="btn" id="ntec-composition-refresh">Atualizar propostas</button></div>'+
    '<div class="formgrid"><div class="field"><label for="ntec-composition-proposal">Proposta para editar *</label><select id="ntec-composition-proposal"><option value="">Carregando propostas…</option></select><small class="muted small">A composição só pode ser alterada enquanto a proposta estiver em rascunho ou revisão.</small></div><div class="field"><label>Cliente / situação</label><div id="ntec-composition-context" class="ntec-composition-context">Selecione uma proposta.</div></div></div>'+
+   '<div id="ntec-norm-package" class="panel" style="margin:16px 0;padding:14px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:10px"><div class="titleline"><div><h3>Modelos de serviço e normas aplicáveis</h3><p class="sub">Escolha o serviço. O portal associa as referências normativas e deixa os itens sugeridos marcados para você revisar antes de adicionar.</p></div></div>'+
+   '<div class="formgrid"><div class="field"><label for="ntec-norm-template">Serviço / modelo de proposta</label><select id="ntec-norm-template"><option value="">Selecione o tipo de serviço…</option><option value="concreto_moldagem_axial">Concreto — moldagem + ruptura axial</option><option value="concreto_moldagem">Concreto — somente moldagem</option><option value="concreto_axial">Concreto — somente ruptura axial</option><option value="concreto_diametral">Concreto — ruptura diametral</option><option value="concreto_flexao">Concreto — tração na flexão</option><option value="argamassa_moldagem">Argamassa — moldagem de corpos de prova</option><option value="graute_moldagem_axial">Graute — moldagem + ruptura axial (confirmar método)</option></select></div><div class="field"><label>Normas / referências associadas</label><div id="ntec-norm-refs" class="ntec-composition-context">Selecione um serviço para ver as referências.</div></div></div>'+
+   '<div id="ntec-norm-warning" class="ntec-ai-disclaimer" style="margin:10px 0">A norma sugerida é uma referência inicial. Confirme material, geometria do corpo de prova, idade, método de ensaio e escopo contratado antes de emitir a proposta.</div>'+
+   '<div id="ntec-norm-items" class="ntec-norm-items"><p class="muted small">Os itens disponíveis serão exibidos aqui.</p></div>'+
+   '<div class="ntec-ai-actions"><button class="btn primary" id="ntec-norm-add" type="button" disabled>Adicionar itens marcados à proposta</button><span id="ntec-norm-message" role="status" aria-live="polite"></span></div>'+
+   '<p class="footnote">A moldagem de concreto é referenciada à ABNT NBR 5738; o ensaio de resistência à compressão axial de corpos cilíndricos, à ABNT NBR 5739; o ensaio diametral, à NBR 7222; a tração na flexão, à NBR 12142. A NBR 16886 (amostragem do concreto fresco) só é indicada quando a coleta estiver no escopo. Para argamassa/graute, verifique a geometria e a norma exigida pelo projeto antes de confirmar a composição.</p></div>'+
    '<div class="tablewrap"><table class="ntec-pg-table ntec-line-items-table"><thead><tr><th>Descrição do item / serviço</th><th>Qtd.</th><th>Unidade</th><th>Preço unitário (R$)</th><th>Desconto %</th><th>Total do item (R$)</th><th></th></tr></thead><tbody id="ntec-composition-body"><tr><td colspan="7" class="empty">Selecione uma proposta para carregar a composição.</td></tr></tbody></table></div>'+
    '<div class="ntec-ai-actions"><button class="btn" id="ntec-composition-add" type="button">+ Adicionar item</button><button class="btn primary" id="ntec-composition-save" type="button" disabled>Salvar demonstrativo e atualizar total</button><span id="ntec-composition-message" role="status" aria-live="polite"></span></div>'+
    '<div class="ntec-composition-total"><div><span>Subtotal</span><strong id="ntec-composition-subtotal">R$ 0,00</strong></div><div><span>Descontos</span><strong id="ntec-composition-discounts">R$ 0,00</strong></div><div class="grand"><span>Total da proposta</span><strong id="ntec-composition-total">R$ 0,00</strong></div></div>'+
@@ -322,7 +333,114 @@ runtime = r'''<script>
   $('ntec-composition-refresh').addEventListener('click',()=>loadCompositionList(true,activeCompositionProposal?.id||null));
   $('ntec-composition-add').addEventListener('click',()=>addCompositionLine({}));
   $('ntec-composition-save').addEventListener('click',saveComposition);
+  $('ntec-norm-template').addEventListener('change',renderNormTemplate);
+  $('ntec-norm-add').addEventListener('click',addSelectedNormItems);
   return true;
+ }
+ const normTemplates={
+  concreto_moldagem_axial:{
+   label:'Concreto — moldagem + ruptura axial',
+   norms:[
+    {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem e cura de corpos de prova cilíndricos ou prismáticos de concreto.'},
+    {code:'ABNT NBR 5739:2018',text:'Ensaio de compressão de corpos de prova cilíndricos de concreto.'},
+    {code:'ABNT NBR 16886:2020',text:'Amostragem de concreto fresco — referência somente se a coleta estiver contratada.'},
+    {code:'ABNT NBR 12655:2015 + Emenda 1:2022',text:'Referência geral para preparo, controle, recebimento e aceitação do concreto; confirmar edição aplicável ao contrato.'}
+   ],
+   rules:[{category:'Ensaios de Concreto',match:'moldagem de corpos de provas (concreto)',checked:true},{category:'Ensaios de Concreto',match:'ruptura axial de corpos de provas cilindricos',checked:true}],
+   warning:'O catálogo atual marca a moldagem como “Incluso” e preço R$ 0,00. Antes de salvar, decida se o serviço será incluído sem cobrança ou se a tabela de referência deve receber um preço. O item de amostragem não será adicionado automaticamente porque não há item separado identificado para coleta no catálogo.'
+  },
+  concreto_moldagem:{
+   label:'Concreto — somente moldagem',
+   norms:[
+    {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem e cura de corpos de prova de concreto.'},
+    {code:'ABNT NBR 16886:2020 (condicional)',text:'Amostragem do concreto fresco, apenas quando a coleta fizer parte do escopo.'}
+   ],
+   rules:[{category:'Ensaios de Concreto',match:'moldagem de corpos de provas (concreto)',checked:true}],
+   warning:'A tabela atual marca moldagem de concreto como “Incluso” (R$ 0,00). Confira se deve permanecer incluída na proposta ou se será precificada. A coleta/amostragem é uma atividade distinta.'
+  },
+  concreto_axial:{
+   label:'Concreto — ruptura axial',
+   norms:[
+    {code:'ABNT NBR 5739:2018',text:'Ensaio de compressão de corpos de prova cilíndricos de concreto.'},
+    {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Referência associada à moldagem/cura e rastreabilidade dos corpos de prova.'}
+   ],
+   rules:[{category:'Ensaios de Concreto',match:'ruptura axial de corpos de provas cilindricos',checked:true}],
+   warning:'Confirme as dimensões (por exemplo, 10×20 cm ou 15×30 cm), idade de ruptura, identificação e rastreabilidade dos corpos de prova. A moldagem pode ser um item separado ou já estar incluída no contrato.'
+  },
+  concreto_diametral:{
+   label:'Concreto — ruptura diametral',
+   norms:[
+    {code:'ABNT NBR 7222:2011',text:'Determinação da resistência à tração por compressão diametral de corpos de prova cilíndricos.'},
+    {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem/cura dos corpos de prova, quando fizer parte do procedimento contratado.'}
+   ],
+   rules:[{category:'Ensaios de Concreto',match:'ruptura diametral de corpos de provas cilindricos',checked:true}],
+   warning:'A ruptura diametral não é o mesmo serviço que a ruptura axial por compressão. Confirme que a solicitação do cliente é realmente tração por compressão diametral.'
+  },
+  concreto_flexao:{
+   label:'Concreto — tração na flexão',
+   norms:[
+    {code:'ABNT NBR 12142:2010',text:'Determinação da resistência à tração na flexão de corpos de prova prismáticos de concreto.'},
+    {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem/cura dos corpos de prova prismáticos, conforme escopo.'}
+   ],
+   rules:[{category:'Ensaios de Concreto',match:'ruptura tração na flexão',checked:true}],
+   warning:'Confirme a geometria do prisma e os pontos de carregamento previstos pelo método normativo e pelo laboratório.'
+  },
+  argamassa_moldagem:{
+   label:'Argamassa — moldagem de corpos de prova',
+   norms:[
+    {code:'ABNT NBR 13279:2005',text:'Resistência à tração na flexão e à compressão de argamassa endurecida em corpos de prova prismáticos.'}
+   ],
+   rules:[{category:'Ensaios de Argamassa',match:'moldagem de corpos de provas (argamassa)',checked:true}],
+   warning:'A NBR 13279 trata de ensaios em corpos de prova prismáticos, tipicamente 4×4×16 cm. O item de ruptura axial cilíndrica 5×10 cm existente no catálogo não deve ser associado automaticamente a essa norma sem confirmação do método e da especificação do cliente.'
+  },
+  graute_moldagem_axial:{
+   label:'Graute — moldagem + ruptura axial',
+   norms:[
+    {code:'Referência técnica a confirmar pelo projeto / especificação do graute',text:'O método de moldagem, cura e resistência deve ser definido pelo tipo de graute, geometria do corpo de prova e norma contratual.'},
+    {code:'ABNT NBR 5738 / NBR 5739 — somente se explicitamente aplicáveis ao método contratado',text:'Não assumir automaticamente que o procedimento de concreto é aplicável ao graute sem validar a especificação técnica.'}
+   ],
+   rules:[{category:'Ensaios de Graute',match:'moldagem de corpos de provas (graute)',checked:true},{category:'Ensaios de Graute',match:'ruptura axial de corpos de provas cilindricos',checked:true}],
+   warning:'Para graute, valide no projeto/especificação o corpo de prova, método de moldagem/cura, idade e ensaio de resistência. O portal deixará esses itens como sugestões para revisão, não como definição normativa automática.'
+  }
+ };
+ function renderNormTemplate(){
+  const key=$('ntec-norm-template')?.value,template=normTemplates[key];
+  const refs=$('ntec-norm-refs'),items=$('ntec-norm-items'),add=$('ntec-norm-add'),warning=$('ntec-norm-warning');
+  if(!refs||!items||!add||!warning)return;
+  if(!template){refs.textContent='Selecione um serviço para ver as referências.';items.innerHTML='<p class="muted small">Os itens disponíveis serão exibidos aqui.</p>';warning.textContent='A norma sugerida é uma referência inicial. Confirme material, geometria do corpo de prova, idade, método de ensaio e escopo contratado antes de emitir a proposta.';add.disabled=true;return}
+  refs.innerHTML='<ul style="margin:4px 0;padding-left:18px">'+template.norms.map(n=>'<li style="margin:5px 0"><strong>'+esc(n.code)+'</strong><div class="muted small">'+esc(n.text)+'</div></li>').join('')+'</ul>';
+  warning.textContent=template.warning;
+  const found=template.rules.map((rule,index)=>{
+   const row=rows.find(r=>norm(r.category)===norm(rule.category)&&norm(r.item_name).includes(norm(rule.match)));
+   return row?{rule,index,row}:null;
+  }).filter(Boolean);
+  if(!found.length){items.innerHTML='<p class="muted small">Não localizei os itens correspondentes na tabela de referência. Você ainda pode usar a lista de normas, mas deverá cadastrar/selecionar o serviço manualmente.</p>';add.disabled=true;return}
+  items._ntecNormRows=found.map(x=>x.row);
+  items.innerHTML=found.map(({rule,index,row})=>{
+   const value=String(row.price_label||'').trim()||money(row.reference_price);
+   return '<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" data-ntec-norm-row="'+index+'" '+(rule.checked?'checked':'')+' style="margin-top:4px"/><span><strong>'+esc(row.item_name)+'</strong><br/><span class="muted small">'+esc(row.category)+' · '+esc(row.unit)+' · Referência: '+esc(value)+'</span></span></label>';
+  }).join('')+'<p class="muted small">Os valores são os que estão cadastrados agora na tabela de referência. Confira-os, sobretudo quando aparecer “Incluso”/R$ 0,00.</p>';
+  add.disabled=false;
+ }
+ function addSelectedNormItems(){
+  const key=$('ntec-norm-template')?.value,template=normTemplates[key];
+  const status=$('ntec-norm-message');
+  if(!template){if(status)status.textContent='Selecione primeiro um modelo.';return}
+  if(!compositionEditable(activeCompositionProposal)){if(status)status.textContent='Selecione uma proposta em rascunho ou revisão.';return}
+  const items=$('ntec-norm-items'),refRows=items?items._ntecNormRows||[]:[];
+  const normText=template.norms.map(n=>n.code).join('; ');
+  const existing=new Set(readCompositionItems().map(x=>x.reference_value_id).filter(Boolean));
+  let added=0,skipped=0;
+  for(const checkbox of items.querySelectorAll('input[data-ntec-norm-row]:checked')){
+   const ref=refRows[Number(checkbox.dataset.ntecNormRow)];if(!ref)continue;
+   if(existing.has(String(ref.id))){skipped++;continue}
+   const priceLabel=String(ref.price_label||'').trim();
+   const description=ref.item_name+' — Norma(s): '+normText;
+   addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id});
+   existing.add(String(ref.id));added++;
+  }
+  compositionDirty=compositionDirty||added>0;updateCompositionTotals();
+  if(status)status.textContent=added?(added+' item(ns) adicionado(s) à proposta. Revise quantidades, preços e normas antes de salvar.'+(skipped?' '+skipped+' item(ns) repetido(s) ignorado(s).':'')):'Nenhum item novo adicionado. Marque pelo menos um item ou confira se já está na composição.';
  }
  function compositionEditable(p){return Boolean(p&&['rascunho','em_revisao'].includes(p.status))}
  function fmtQty(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3})}
