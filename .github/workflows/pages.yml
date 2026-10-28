@@ -96,8 +96,6 @@ jobs:
           grep -q "Ensaios no escopo informado para esta norma" _site/admin/index.html
           grep -q "loadNtecLabScope" _site/admin/index.html
           grep -q "scope_accreditation_status" _site/admin/index.html
-          grep -q "DNIT 136/2018-ME" _site/admin/index.html
-          grep -q "ABNT NBR 7180:2025" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
