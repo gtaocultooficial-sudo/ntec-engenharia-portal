@@ -178,9 +178,17 @@ Deno.serve(async (req: Request) => {
   if (![min, max, recommended, annual].every(Number.isFinite) || min < 0 || max < min || recommended < 0 || annual < -20 || annual > 100) {
     return json({ error: "A IA devolveu uma faixa ou percentual fora dos limites de validação. Gere uma nova análise." }, 502);
   }
-  if (estimate.assessment !== "sem_preco_numerico" && currentPrice < min) estimate.assessment = "abaixo";
-  else if (estimate.assessment !== "sem_preco_numerico" && currentPrice > max) estimate.assessment = "acima";
-  else if (estimate.assessment !== "sem_preco_numerico") estimate.assessment = "na_faixa";
+  // Um rótulo como "Incluso" ou ausência de preço numérico não deve impedir a pesquisa,
+  // nem ser comparado artificialmente como se R$ 0,00 fosse um preço válido.
+  if (priceLabel || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+    estimate.assessment = "sem_preco_numerico";
+  } else if (currentPrice < min) {
+    estimate.assessment = "abaixo";
+  } else if (currentPrice > max) {
+    estimate.assessment = "acima";
+  } else {
+    estimate.assessment = "na_faixa";
+  }
 
   const annotations: any[] = [];
   for (const item of data?.output || []) {
