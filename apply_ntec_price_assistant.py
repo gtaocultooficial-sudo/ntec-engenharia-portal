@@ -123,9 +123,9 @@ runtime = r'''<script>
   const select=$('ntec-ai-item');if(!select)return;
   const active=rows.filter(r=>r.is_active);
   select.innerHTML='<option value="">Selecione um item cadastrado…</option>'+active.map(r=>{
-   const codes=String(r.normative_references||'').match(/(?:ABNT\s+)?NBR\s+\d+(?::\d{4})?|DNER-PRO\s+\d+\/\d{2,4}/gi)||[];
-   const normLabel=[...new Set(codes.map(n=>n.replace(/^NBR/i,'ABNT NBR').toUpperCase()))].slice(0,3).join(' / ')||'Norma a confirmar conforme escopo';
-   return '<option value="'+esc(r.id)+'">'+esc('['+normLabel+'] '+(r.item_code?r.item_code+' · ':'')+r.item_name+' — '+r.category+' ('+r.unit+')'+(r.price_label?' ['+r.price_label+']':''))+'</option>';
+   const codes=extractNormTokens(r.normative_references||'');
+   const normLabel=codes.slice(0,3).join(' / ')||'Norma a confirmar conforme escopo';
+   return '<option value="'+esc(r.id)+'">'+esc('['+normLabel+'] '+(r.item_code?r.item_code+' · ':'')+r.item_name+' — '+r.category+' ('+r.unit+')'+(r.scope_accreditation_status?' ['+r.scope_accreditation_status+']':'')+(r.price_label?' ['+r.price_label+']':''))+'</option>';
   }).join('');
   if(keepId&&active.some(r=>String(r.id)===String(keepId)))select.value=keepId;
  }
@@ -295,8 +295,10 @@ runtime = r'''<script>
   row.dataset.referenceValueId=item.id;
   row.dataset.normativeReferences=String(item.normative_references||'');
   row.dataset.normativeNote=String(item.normative_note||'');
+  row.dataset.scopeAccreditationStatus=String(item.scope_accreditation_status||'');
   const normLabel=row.querySelector('[data-line-norm]');if(normLabel)normLabel.textContent=normPrefix?'NORMAS/REFERÊNCIAS: '+normPrefix:'Norma específica a confirmar conforme método e escopo contratado.';
   const normNote=row.querySelector('[data-line-norm-note]');if(normNote)normNote.textContent=String(item.normative_note||'');
+  const statusLabel=row.querySelector('[data-line-accreditation]');if(statusLabel)statusLabel.textContent='Status do escopo: '+(item.scope_accreditation_status||'não cadastrado — confirmar antes de declarar');
   input.title=(normPrefix?'Referência normativa associada: '+normPrefix+'. ':'')+(item.price_label?'Valor textual na referência: '+item.price_label+'. Confirme antes de enviar a proposta.':'Preço preenchido pela tabela de referência. Confirme quantidade e condições.');
   closePopup();
  }
@@ -304,7 +306,7 @@ runtime = r'''<script>
   document.addEventListener('input',e=>{
    if(!descriptionInput(e.target))return;
    if(e.target.dataset.ntecPickingRef==='1')return;
-   const changedRow=e.target.closest('tr');if(changedRow){delete changedRow.dataset.referenceValueId;delete changedRow.dataset.normativeReferences;delete changedRow.dataset.normativeNote;const nl=changedRow.querySelector('[data-line-norm]');if(nl)nl.textContent='Selecione um item do catálogo para associar a norma aplicável.';const nn=changedRow.querySelector('[data-line-norm-note]');if(nn)nn.textContent='';}
+   const changedRow=e.target.closest('tr');if(changedRow){delete changedRow.dataset.referenceValueId;delete changedRow.dataset.normativeReferences;delete changedRow.dataset.normativeNote;delete changedRow.dataset.scopeAccreditationStatus;const nl=changedRow.querySelector('[data-line-norm]');if(nl)nl.textContent='Selecione um item do catálogo para associar a norma aplicável.';const nn=changedRow.querySelector('[data-line-norm-note]');if(nn)nn.textContent='';const sa=changedRow.querySelector('[data-line-accreditation]');if(sa)sa.textContent='Status do escopo: não cadastrado';}
    const q=e.target.value.trim();
    if(q.length<2){closePopup();return}
    showPopup(e.target,matchingRows(q));
@@ -344,7 +346,7 @@ runtime = r'''<script>
    '<div class="ntec-composition-total"><div><span>Subtotal</span><strong id="ntec-composition-subtotal">R$ 0,00</strong></div><div><span>Descontos</span><strong id="ntec-composition-discounts">R$ 0,00</strong></div><div class="grand"><span>Total da proposta</span><strong id="ntec-composition-total">R$ 0,00</strong></div></div>'+
    '<p class="footnote">Os itens são salvos em Supabase ligados à proposta. Se você remover um item e salvar, ele também será removido da composição daquela proposta. O valor total da proposta é recalculado. Itens de propostas aprovadas/enviadas ficam somente para consulta.</p>';
   const style=document.createElement('style');style.id='ntec-composition-style';
-  style.textContent='#ntec-composition-panel{border:1px solid var(--line);border-radius:12px}#ntec-composition-panel .ntec-composition-context{padding:10px;border:1px solid var(--line);border-radius:8px;min-height:20px;font-size:13px;line-height:1.5}#ntec-composition-panel .ntec-composition-total{margin:12px 0 0 auto;max-width:360px;border:1px solid var(--line);border-radius:9px;padding:12px 15px;display:grid;gap:9px}#ntec-composition-panel .ntec-composition-total>div{display:flex;justify-content:space-between;gap:18px}#ntec-composition-panel .ntec-composition-total span{color:var(--muted)}#ntec-composition-panel .ntec-composition-total .grand{border-top:1px solid var(--line);padding-top:10px;font-size:16px}#ntec-composition-panel .ntec-composition-total .grand strong{font-size:20px}#ntec-composition-panel .ntec-line-items-table{min-width:900px}#ntec-composition-panel .ntec-line-items-table input{width:100%;min-width:68px;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}#ntec-composition-panel .ntec-line-description{min-width:220px}#ntec-composition-panel .ntec-line-norm,#ntec-composition-panel .ntec-line-norm-note{display:block;font-size:11px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;margin-top:4px;color:var(--muted)}#ntec-composition-panel .ntec-line-norm{color:#1d4f91;font-weight:600}#ntec-composition-panel .ntec-line-norm-note{font-weight:400}#ntec-composition-panel .ntec-line-unit{min-width:82px}@media(max-width:700px){#ntec-composition-panel .ntec-composition-total{max-width:none}}';
+  style.textContent='#ntec-composition-panel{border:1px solid var(--line);border-radius:12px}#ntec-composition-panel .ntec-composition-context{padding:10px;border:1px solid var(--line);border-radius:8px;min-height:20px;font-size:13px;line-height:1.5}#ntec-composition-panel .ntec-composition-total{margin:12px 0 0 auto;max-width:360px;border:1px solid var(--line);border-radius:9px;padding:12px 15px;display:grid;gap:9px}#ntec-composition-panel .ntec-composition-total>div{display:flex;justify-content:space-between;gap:18px}#ntec-composition-panel .ntec-composition-total span{color:var(--muted)}#ntec-composition-panel .ntec-composition-total .grand{border-top:1px solid var(--line);padding-top:10px;font-size:16px}#ntec-composition-panel .ntec-composition-total .grand strong{font-size:20px}#ntec-composition-panel .ntec-line-items-table{min-width:900px}#ntec-composition-panel .ntec-line-items-table input{width:100%;min-width:68px;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}#ntec-composition-panel .ntec-line-description{min-width:220px}#ntec-composition-panel .ntec-line-norm,#ntec-composition-panel .ntec-line-norm-note{display:block;font-size:11px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;margin-top:4px;color:var(--muted)}#ntec-composition-panel .ntec-line-norm{color:#1d4f91;font-weight:600}#ntec-composition-panel .ntec-line-norm-note{font-weight:400}#ntec-composition-panel .ntec-line-accreditation{display:inline-block;margin-top:5px;padding:3px 6px;border-radius:5px;background:#f1f5f9;color:#334155;font-weight:700}#ntec-composition-panel .ntec-line-unit{min-width:82px}@media(max-width:700px){#ntec-composition-panel .ntec-composition-total{max-width:none}}';
   document.head.appendChild(style);section.appendChild(box);
   $('ntec-composition-proposal').addEventListener('change',e=>{
    const next=e.target.value;
@@ -364,11 +366,15 @@ runtime = r'''<script>
  }
  function canonicalNormToken(raw){
   let token=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');
-  if(/^NBR\b/i.test(token))token='ABNT '+token;
+  token=token.replace(/^NBR\b/,'ABNT NBR');
+  token=token.replace(/^ABNT NBR (\d+(?:-\d+)?)\/(\d{4})$/,'ABNT NBR $1:$2');
+  token=token.replace(/^DNER\s*[-–]?\s*ME\s+(\d{3})\s*[:\/]\s*(\d{2,4})$/,'DNER-ME $1:$2');
+  token=token.replace(/^DNIT\s+(\d+)\s*\/\s*(\d{4})\s*[-–]?\s*ME$/,'DNIT $1/$2-ME');
+  token=token.replace(/^DNER-PRO\s+(\d+)\s*\/\s*(\d{4})$/,'DNER-PRO $1/$2');
   return token;
  }
  function extractNormTokens(text){
-  const found=String(text||'').match(/(?:ABNT\s+)?NBR\s+\d+(?::\d{4})?|DNER-PRO\s+\d+\/\d{2,4}/gi)||[];
+  const found=String(text||'').match(/(?:ABNT\s+)?NBR\s+\d+(?:-\d+)?(?:[:\/]\d{4})?|DNIT\s+\d+\s*\/\s*\d{4}(?:\s*[-–]?\s*ME)?|DNER\s*[-–]?\s*ME\s+\d{3}\s*[:\/]\s*\d{2,4}|DNER-PRO\s+\d+\s*\/\s*\d{4}/gi)||[];
   return [...new Set(found.map(canonicalNormToken))];
  }
  function renderNormBundleOptions(){
@@ -390,8 +396,8 @@ runtime = r'''<script>
   const matched=rows.filter(r=>r.is_active&&extractNormTokens(r.normative_references).includes(standard));
   box._ntecBundleRows=matched;
   if(!matched.length){box.innerHTML='<p class="muted small">Não há serviços ativos vinculados a esta norma. Confira o cadastro de referências normativas.</p>';updateNormBundleSummary();return}
-  box.innerHTML='<table style="width:100%;min-width:900px;border-collapse:collapse"><thead><tr><th style="padding:8px;text-align:left">Incluir</th><th style="padding:8px;text-align:left">Código / serviço</th><th style="padding:8px;text-align:left">Unidade</th><th style="padding:8px;text-align:right">Preço referência</th><th style="padding:8px;text-align:right">Qtd.</th><th style="padding:8px;text-align:right">Preço proposto (R$)</th><th style="padding:8px;text-align:right">Total (R$)</th></tr></thead><tbody>'+
-  matched.map((r,i)=>'<tr data-ntec-bundle-line="'+i+'" style="border-top:1px solid var(--line)"><td style="padding:8px"><input type="checkbox" data-bundle-check checked aria-label="Incluir '+esc(r.item_name)+'"/></td><td style="padding:8px;min-width:240px"><strong>'+esc((r.item_code?r.item_code+' · ':'')+r.item_name)+'</strong><small style="display:block;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.35">Normas: '+esc(r.normative_references||standard)+'</small>'+(r.normative_note?'<small style="display:block;margin-top:3px;color:var(--muted);font-size:11px">'+esc(r.normative_note)+'</small>':'')+'</td><td style="padding:8px;white-space:nowrap">'+esc(r.unit||'serviço')+'</td><td style="padding:8px;text-align:right;white-space:nowrap">'+(r.price_label?esc(r.price_label)+' · ':'')+money(r.reference_price||0)+'</td><td style="padding:8px"><input data-bundle-qty type="number" min="0.001" step="0.001" value="1" style="width:90px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Quantidade para '+esc(r.item_name)+'"/></td><td style="padding:8px"><input data-bundle-price type="number" min="0" step="0.01" value="'+esc(Number(r.reference_price||0).toFixed(2))+'" style="width:130px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Preço proposto para '+esc(r.item_name)+'"/></td><td data-bundle-total style="padding:8px;text-align:right;white-space:nowrap">'+money(r.reference_price||0)+'</td></tr>').join('')+
+  box.innerHTML='<table style="width:100%;min-width:900px;border-collapse:collapse"><thead><tr><th style="padding:8px;text-align:left">Incluir</th><th style="padding:8px;text-align:left">Código / serviço</th><th style="padding:8px;text-align:left">Status de acreditação no escopo</th><th style="padding:8px;text-align:left">Unidade</th><th style="padding:8px;text-align:right">Preço referência</th><th style="padding:8px;text-align:right">Qtd.</th><th style="padding:8px;text-align:right">Preço proposto (R$)</th><th style="padding:8px;text-align:right">Total (R$)</th></tr></thead><tbody>'+
+  matched.map((r,i)=>'<tr data-ntec-bundle-line="'+i+'" style="border-top:1px solid var(--line)"><td style="padding:8px"><input type="checkbox" data-bundle-check checked aria-label="Incluir '+esc(r.item_name)+'"/></td><td style="padding:8px;min-width:240px"><strong>'+esc((r.item_code?r.item_code+' · ':'')+r.item_name)+'</strong><small style="display:block;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.35">Normas: '+esc(r.normative_references||standard)+'</small>'+(r.normative_note?'<small style="display:block;margin-top:3px;color:var(--muted);font-size:11px">'+esc(r.normative_note)+'</small>':'')+'</td><td style="padding:8px;min-width:150px"><span style="display:inline-block;padding:4px 7px;border-radius:6px;font-size:11px;font-weight:700;background:'+(r.scope_accreditation_status==='Acreditado'?'#dcfce7':r.scope_accreditation_status==='Não acreditado'?'#fef3c7':'#e2e8f0')+';color:'+(r.scope_accreditation_status==='Acreditado'?'#166534':r.scope_accreditation_status==='Não acreditado'?'#92400e':'#334155')+'">'+esc(r.scope_accreditation_status||'Status não cadastrado')+'</span></td><td style="padding:8px;white-space:nowrap">'+esc(r.unit||'serviço')+'</td><td style="padding:8px;text-align:right;white-space:nowrap">'+(r.price_label?esc(r.price_label)+' · ':'')+money(r.reference_price||0)+'</td><td style="padding:8px"><input data-bundle-qty type="number" min="0.001" step="0.001" value="1" style="width:90px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Quantidade para '+esc(r.item_name)+'"/></td><td style="padding:8px"><input data-bundle-price type="number" min="0" step="0.01" value="'+esc(Number(r.reference_price||0).toFixed(2))+'" style="width:130px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Preço proposto para '+esc(r.item_name)+'"/></td><td data-bundle-total style="padding:8px;text-align:right;white-space:nowrap">'+money(r.reference_price||0)+'</td></tr>').join('')+
   '</tbody></table>';
   updateNormBundleSummary();
  }
@@ -426,7 +432,7 @@ runtime = r'''<script>
    const qty=Number(tr.querySelector('[data-bundle-qty]')?.value),price=Number(tr.querySelector('[data-bundle-price]')?.value);
    if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0){if(status)status.textContent='Revise quantidade e preço de todos os serviços marcados.';return}
    const description=standard+' — '+ref.item_name;
-   addCompositionLine({description,quantity:qty,unit:ref.unit||'serviço',unit_price:price,discount_percent:0,reference_value_id:ref.id,normative_references:ref.normative_references||standard,normative_note:ref.normative_note||('Adicionado pelo conjunto da norma '+standard+'. Confirme o escopo antes de enviar.')});
+   addCompositionLine({description,quantity:qty,unit:ref.unit||'serviço',unit_price:price,discount_percent:0,reference_value_id:ref.id,normative_references:ref.normative_references||standard,normative_note:ref.normative_note||('Adicionado pelo conjunto da norma '+standard+'. Confirme o escopo antes de enviar.'),scope_accreditation_status:ref.scope_accreditation_status||'Status não cadastrado'});
    existing.add(String(ref.id));added++;
   }
   compositionDirty=compositionDirty||added>0;updateCompositionTotals();updateNormBundleSummary();
@@ -544,8 +550,8 @@ runtime = r'''<script>
  function fmtQty(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3})}
  function compositionLineHtml(item){
   const qty=item.quantity==null?1:item.quantity,discount=item.discount_percent==null?0:item.discount_percent,unitPrice=item.unit_price==null?'':item.unit_price;
-  const normative=String(item.normative_references||'').trim(),normNote=String(item.normative_note||'').trim();
-  return '<tr data-composition-line="1"><td><div class="ntec-composition-description"><input class="ntec-line-description" data-line-field="description" aria-label="Descrição do item" maxlength="500" value="'+esc(item.description||'')+'" placeholder="Digite para buscar na referência" required/><small class="ntec-line-norm" data-line-norm>'+(normative?'NORMAS/REFERÊNCIAS: '+esc(normative):'Selecione um item do catálogo para associar a norma aplicável.')+'</small><small class="ntec-line-norm-note" data-line-norm-note>'+esc(normNote)+'</small></div></td>'+
+  const normative=String(item.normative_references||'').trim(),normNote=String(item.normative_note||'').trim(),accreditation=String(item.scope_accreditation_status||'').trim();
+  return '<tr data-composition-line="1"><td><div class="ntec-composition-description"><input class="ntec-line-description" data-line-field="description" aria-label="Descrição do item" maxlength="500" value="'+esc(item.description||'')+'" placeholder="Digite para buscar na referência" required/><small class="ntec-line-norm" data-line-norm>'+(normative?'NORMAS/REFERÊNCIAS: '+esc(normative):'Selecione um item do catálogo para associar a norma aplicável.')+'</small><small class="ntec-line-norm-note" data-line-norm-note>'+esc(normNote)+'</small><small class="ntec-line-accreditation" data-line-accreditation>Status do escopo: '+esc(accreditation||'não cadastrado — confirmar antes de declarar')+'</small></div></td>'+
    '<td><input data-line-field="quantity" aria-label="Quantidade" type="number" min="0.001" step="0.001" value="'+esc(qty)+'" required/></td>'+
    '<td><input class="ntec-line-unit" data-line-field="unit" aria-label="Unidade" maxlength="40" value="'+esc(item.unit||'serviço')+'" required/></td>'+
    '<td><input data-line-field="unit_price" aria-label="Preço unitário" type="number" min="0" step="0.01" value="'+esc(unitPrice)+'" required/></td>'+
@@ -561,6 +567,7 @@ runtime = r'''<script>
   if(item?.reference_value_id)row.dataset.referenceValueId=item.reference_value_id;
   if(item?.normative_references)row.dataset.normativeReferences=item.normative_references;
   if(item?.normative_note)row.dataset.normativeNote=item.normative_note;
+  if(item?.scope_accreditation_status)row.dataset.scopeAccreditationStatus=item.scope_accreditation_status;
   row.querySelectorAll('[data-line-field]').forEach(el=>el.addEventListener('input',()=>{compositionDirty=true;updateCompositionTotals()}));
   row.querySelector('.ntec-line-remove').addEventListener('click',()=>{row.remove();compositionDirty=true;updateCompositionTotals()});
   updateCompositionTotals();updateCompositionControls();
@@ -568,7 +575,7 @@ runtime = r'''<script>
  function readCompositionItems(){
   return [...document.querySelectorAll('#ntec-composition-body [data-composition-line]')].map(row=>{
    const v={};row.querySelectorAll('[data-line-field]').forEach(el=>v[el.dataset.lineField]=el.value);
-   return {id:row.dataset.lineId||undefined,reference_value_id:row.dataset.referenceValueId||null,normative_references:String(row.dataset.normativeReferences||''),normative_note:String(row.dataset.normativeNote||''),description:String(v.description||'').trim(),quantity:Number(v.quantity),unit:String(v.unit||'').trim(),unit_price:Number(v.unit_price),discount_percent:Number(v.discount_percent||0)};
+   return {id:row.dataset.lineId||undefined,reference_value_id:row.dataset.referenceValueId||null,normative_references:String(row.dataset.normativeReferences||''),normative_note:String(row.dataset.normativeNote||''),scope_accreditation_status:String(row.dataset.scopeAccreditationStatus||''),description:String(v.description||'').trim(),quantity:Number(v.quantity),unit:String(v.unit||'').trim(),unit_price:Number(v.unit_price),discount_percent:Number(v.discount_percent||0)};
   });
  }
  function updateCompositionTotals(){
