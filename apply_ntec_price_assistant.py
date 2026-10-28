@@ -68,7 +68,7 @@ runtime = r'''<script>
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const norm=v=>String(v||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
  const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
- let rows=[],selected=null,lastEstimate=null,lastSavedReview=null,busy=false,initialized=false,activeInput=null,popup=null;
+ let rows=[],labScopeRows=[],selected=null,lastEstimate=null,lastSavedReview=null,busy=false,initialized=false,activeInput=null,popup=null;
  let compositionProposals=[],activeCompositionProposal=null,compositionDirty=false,compositionBusy=false;
  function msg(t,error){const el=$('ntec-ai-message');if(el){el.textContent=t||'';el.style.color=error?'#b42318':'var(--muted)'}}
  function sourceDate(item){
@@ -131,7 +131,7 @@ runtime = r'''<script>
  }
  async function loadRefs(){
   if(!api()?.loadProposalReferenceValues)return;
-  try{rows=await api().loadProposalReferenceValues();window.NTEC_PRICE_REFERENCE_CACHE=rows;renderOptions(selected?.id);renderNormBundleOptions();await selectItem($('ntec-ai-item')?.value||'')}
+  try{rows=await api().loadProposalReferenceValues();window.NTEC_PRICE_REFERENCE_CACHE=rows;if(api()?.loadNtecLabScope)labScopeRows=await api().loadNtecLabScope();renderOptions(selected?.id);renderNormBundleOptions();await selectItem($('ntec-ai-item')?.value||'')}
   catch(e){msg('Não foi possível carregar os preços de referência: '+(e?.message||'erro'),true)}
  }
  async function selectItem(id){
@@ -379,11 +379,13 @@ runtime = r'''<script>
  }
  function renderNormBundleOptions(){
   const select=$('ntec-norm-bundle-standard');if(!select)return;
-  const counts=new Map();
+  const counts=new Map(),scopeCounts=new Map();
   rows.filter(r=>r.is_active).forEach(r=>extractNormTokens(r.normative_references).forEach(token=>counts.set(token,(counts.get(token)||0)+1)));
+  labScopeRows.forEach(item=>extractNormTokens(item.standard_procedure).forEach(token=>scopeCounts.set(token,(scopeCounts.get(token)||0)+1)));
+  for(const token of scopeCounts.keys())if(!counts.has(token))counts.set(token,0);
   const options=[...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR',{numeric:true}));
   const previous=select.value;
-  select.innerHTML='<option value="">Selecione uma norma…</option>'+options.map(([token,count])=>'<option value="'+esc(token)+'">'+esc(token)+' · '+count+' serviço(s) vinculado(s)'+'</option>').join('');
+  select.innerHTML='<option value="">Selecione uma norma ou procedimento…</option>'+options.map(([token,count])=>'<option value="'+esc(token)+'">'+esc(token)+' · '+count+' serviço(s) de proposta'+(scopeCounts.get(token)?' · '+scopeCounts.get(token)+' ensaio(s) no escopo':'' )+'</option>').join('');
   if(options.some(([token])=>token===previous))select.value=previous;
   else select.value='';
   renderNormBundleItems();
@@ -393,10 +395,12 @@ runtime = r'''<script>
   if(!select||!box||!button)return;
   const standard=select.value;
   if(!standard){box.innerHTML='<p class="muted small">Selecione uma norma ou procedimento técnico para carregar o conjunto completo de serviços do catálogo.</p>';box._ntecBundleRows=[];updateNormBundleSummary();return}
+  const scopeForNorm=labScopeRows.filter(item=>extractNormTokens(item.standard_procedure).includes(standard));
+  const scopeHtml=scopeForNorm.length?'<div class="ntec-scope-matrix" style="margin:12px 0 16px;padding:12px;border:1px solid var(--line);border-radius:9px"><h4 style="margin:0 0 8px">Ensaios no escopo informado para esta norma</h4><div style="overflow:auto"><table style="width:100%;min-width:650px;border-collapse:collapse"><thead><tr><th style="text-align:left;padding:7px">Área do escopo</th><th style="text-align:left;padding:7px">Ensaio / descrição técnica</th><th style="text-align:left;padding:7px">Norma / procedimento</th><th style="text-align:left;padding:7px">Status informado</th></tr></thead><tbody>'+scopeForNorm.map(item=>'<tr style="border-top:1px solid var(--line)"><td style="padding:7px;vertical-align:top">'+esc(item.activity_area)+'</td><td style="padding:7px;vertical-align:top">'+esc(item.test_description)+(item.scope_notes?'<small style="display:block;margin-top:3px;color:var(--muted);font-size:11px">'+esc(item.scope_notes)+'</small>':'')+'</td><td style="padding:7px;vertical-align:top">'+esc(item.standard_procedure)+'</td><td style="padding:7px;vertical-align:top"><span style="display:inline-block;padding:4px 7px;border-radius:6px;font-size:11px;font-weight:700;background:'+(item.accreditation_status==='Acreditado'?'#dcfce7':'#fef3c7')+';color:'+(item.accreditation_status==='Acreditado'?'#166534':'#92400e')+'">'+esc(item.accreditation_status)+'</span></td></tr>').join('')+'</tbody></table></div><p class="muted small" style="margin:8px 0 0">Status transcrito do escopo informado; confirme a versão vigente do certificado/escopo antes de declarar acreditação a clientes.</p></div>':'';
   const matched=rows.filter(r=>r.is_active&&extractNormTokens(r.normative_references).includes(standard));
   box._ntecBundleRows=matched;
-  if(!matched.length){box.innerHTML='<p class="muted small">Não há serviços ativos vinculados a esta norma. Confira o cadastro de referências normativas.</p>';updateNormBundleSummary();return}
-  box.innerHTML='<table style="width:100%;min-width:900px;border-collapse:collapse"><thead><tr><th style="padding:8px;text-align:left">Incluir</th><th style="padding:8px;text-align:left">Código / serviço</th><th style="padding:8px;text-align:left">Status de acreditação no escopo</th><th style="padding:8px;text-align:left">Unidade</th><th style="padding:8px;text-align:right">Preço referência</th><th style="padding:8px;text-align:right">Qtd.</th><th style="padding:8px;text-align:right">Preço proposto (R$)</th><th style="padding:8px;text-align:right">Total (R$)</th></tr></thead><tbody>'+
+  if(!matched.length){box.innerHTML=scopeHtml+'<p class="muted small">Não há serviços comerciais vinculados a esta norma. Cadastre os itens de preço para montá-los na proposta.</p>';updateNormBundleSummary();return}
+  box.innerHTML=scopeHtml+'<h4 style="margin:12px 0 6px">Serviços comerciais e preços para a proposta</h4><div class="muted small" style="margin-bottom:8px">Os serviços auxiliares estão separados dos ensaios do escopo. Revise preços e itens antes de incluir.</div><table style="width:100%;min-width:900px;border-collapse:collapse"><thead><tr><th style="padding:8px;text-align:left">Incluir</th><th style="padding:8px;text-align:left">Código / serviço</th><th style="padding:8px;text-align:left">Status de acreditação no escopo</th><th style="padding:8px;text-align:left">Unidade</th><th style="padding:8px;text-align:right">Preço referência</th><th style="padding:8px;text-align:right">Qtd.</th><th style="padding:8px;text-align:right">Preço proposto (R$)</th><th style="padding:8px;text-align:right">Total (R$)</th></tr></thead><tbody>'+
   matched.map((r,i)=>'<tr data-ntec-bundle-line="'+i+'" style="border-top:1px solid var(--line)"><td style="padding:8px"><input type="checkbox" data-bundle-check checked aria-label="Incluir '+esc(r.item_name)+'"/></td><td style="padding:8px;min-width:240px"><strong>'+esc((r.item_code?r.item_code+' · ':'')+r.item_name)+'</strong><small style="display:block;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.35">Normas: '+esc(r.normative_references||standard)+'</small>'+(r.normative_note?'<small style="display:block;margin-top:3px;color:var(--muted);font-size:11px">'+esc(r.normative_note)+'</small>':'')+'</td><td style="padding:8px;min-width:150px"><span style="display:inline-block;padding:4px 7px;border-radius:6px;font-size:11px;font-weight:700;background:'+(r.scope_accreditation_status==='Acreditado'?'#dcfce7':r.scope_accreditation_status==='Não acreditado'?'#fef3c7':'#e2e8f0')+';color:'+(r.scope_accreditation_status==='Acreditado'?'#166534':r.scope_accreditation_status==='Não acreditado'?'#92400e':'#334155')+'">'+esc(r.scope_accreditation_status||'Fora da matriz de escopo enviada')+'</span></td><td style="padding:8px;white-space:nowrap">'+esc(r.unit||'serviço')+'</td><td style="padding:8px;text-align:right;white-space:nowrap">'+(r.price_label?esc(r.price_label)+' · ':'')+money(r.reference_price||0)+'</td><td style="padding:8px"><input data-bundle-qty type="number" min="0.001" step="0.001" value="1" style="width:90px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Quantidade para '+esc(r.item_name)+'"/></td><td style="padding:8px"><input data-bundle-price type="number" min="0" step="0.01" value="'+esc(Number(r.reference_price||0).toFixed(2))+'" style="width:130px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Preço proposto para '+esc(r.item_name)+'"/></td><td data-bundle-total style="padding:8px;text-align:right;white-space:nowrap">'+money(r.reference_price||0)+'</td></tr>').join('')+
   '</tbody></table>';
   updateNormBundleSummary();
@@ -619,7 +623,7 @@ runtime = r'''<script>
   try{
    const previous=desiredId||activeCompositionProposal?.id||$('ntec-composition-proposal')?.value||'';
    compositionProposals=await api().loadProposalPricing();
-   if(api()?.loadProposalReferenceValues){window.NTEC_PRICE_REFERENCE_CACHE=await api().loadProposalReferenceValues();rows=window.NTEC_PRICE_REFERENCE_CACHE;renderOptions(selected?.id);renderNormBundleOptions()}
+   if(api()?.loadProposalReferenceValues){window.NTEC_PRICE_REFERENCE_CACHE=await api().loadProposalReferenceValues();rows=window.NTEC_PRICE_REFERENCE_CACHE;if(api()?.loadNtecLabScope)labScopeRows=await api().loadNtecLabScope();renderOptions(selected?.id);renderNormBundleOptions()}
    const select=$('ntec-composition-proposal');
    select.innerHTML=compositionProposals.length?compositionProposals.map(p=>'<option value="'+esc(p.id)+'" '+(compositionEditable(p)?'':'disabled')+'>'+esc(p.proposal_number||'Proposta')+' · '+esc(p.clients?.company_name||'Cliente')+' · '+esc(p.status)+'</option>').join(''):'<option value="">Nenhuma proposta cadastrada</option>';
    let choice=compositionProposals.find(p=>String(p.id)===String(previous))||compositionProposals.find(compositionEditable)||compositionProposals[0]||null;
@@ -654,7 +658,7 @@ runtime = r'''<script>
  }
  function bind(){
   if(initialized)return;initialized=true;wireAutocomplete();
-  const ready=()=>api()?.loadProposalReferenceValues&&api()?.loadProposalPriceReviews&&api()?.loadProposalPricing&&api()?.saveProposalPricing;
+  const ready=()=>api()?.loadProposalReferenceValues&&api()?.loadNtecLabScope&&api()?.loadProposalPriceReviews&&api()?.loadProposalPricing&&api()?.saveProposalPricing;
   const retry=setInterval(()=>{if(ready()){clearInterval(retry);loadRefs();loadCompositionList(true)}},400);
   if(ready()){clearInterval(retry);loadRefs();loadCompositionList(true)}
   document.querySelectorAll('#nav button').forEach(b=>b.addEventListener('click',()=>{if($('ntec-ref-price-panel'))loadRefs();if(findProposalSection())loadCompositionList(true)}));
