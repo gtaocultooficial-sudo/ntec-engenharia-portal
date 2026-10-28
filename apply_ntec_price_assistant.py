@@ -104,7 +104,7 @@ runtime = r'''<script>
   const title=panel.querySelector('.titleline');
   panel.insertBefore(box,title?title.nextSibling:panel.firstChild);
   const st=document.createElement('style');st.id='ntec-price-ai-style';
-  st.textContent='#ntec-price-ai-panel{border:1px solid var(--line);border-radius:12px}#ntec-price-ai-panel .ntec-ai-tag{font-size:11px;font-weight:700;padding:5px 9px;border-radius:999px;background:#f1f5f9;color:#334155;white-space:nowrap}.ntec-ai-disclaimer{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;margin:8px 0 14px}.ntec-ai-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ntec-ai-actions [role=status]{font-size:12px}.ntec-ai-result{border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;line-height:1.55}.ntec-ai-result .metrics{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:10px 0}.ntec-ai-result .metric{border:1px solid var(--line);border-radius:8px;padding:10px}.ntec-ai-result .metric span{display:block;font-size:11px;color:var(--muted)}.ntec-ai-result .metric strong{display:block;font-size:15px;margin-top:3px}.ntec-ai-status{font-weight:700;display:inline-block;padding:5px 9px;border-radius:999px;background:#fef3c7;color:#92400e}.ntec-ai-status.good{background:#dcfce7;color:#166534}.ntec-ai-status.bad{background:#fee2e2;color:#991b1b}.ntec-ai-history{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.ntec-ai-history h4{margin:0 0 8px}.ntec-ai-history table{width:100%;border-collapse:collapse;font-size:12px}.ntec-ai-history th,.ntec-ai-history td{text-align:left;padding:7px;border-bottom:1px solid var(--line);vertical-align:top}.ntec-ai-history th{color:var(--muted);font-weight:600}.ntec-ai-history .muted{color:var(--muted)}.ntec-price-autocomplete{position:fixed;z-index:100000;max-height:320px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:9px;box-shadow:0 12px 35px #0f172a25;color:#0f172a}.ntec-price-autocomplete button{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;border:0;border-bottom:1px solid #e2e8f0;background:#fff;padding:10px 12px;cursor:pointer;color:inherit}.ntec-price-autocomplete button:hover,.ntec-price-autocomplete button:focus{background:#f1f5f9}.ntec-price-autocomplete strong{font-size:13px}.ntec-price-autocomplete small{font-size:11px;color:#64748b}.ntec-price-autocomplete b{font-size:12px}@media(max-width:720px){.ntec-ai-result .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ntec-ai-actions>*{max-width:100%}}';
+  st.textContent='#ntec-price-ai-panel{border:1px solid var(--line);border-radius:12px}#ntec-price-ai-panel .ntec-ai-tag{font-size:11px;font-weight:700;padding:5px 9px;border-radius:999px;background:#f1f5f9;color:#334155;white-space:nowrap}.ntec-ai-disclaimer{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.5;margin:8px 0 14px}.ntec-ai-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0}.ntec-ai-actions [role=status]{font-size:12px}.ntec-ai-result{border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;line-height:1.55}.ntec-ai-result .metrics{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:10px 0}.ntec-ai-result .metric{border:1px solid var(--line);border-radius:8px;padding:10px}.ntec-ai-result .metric span{display:block;font-size:11px;color:var(--muted)}.ntec-ai-result .metric strong{display:block;font-size:15px;margin-top:3px}.ntec-ai-status{font-weight:700;display:inline-block;padding:5px 9px;border-radius:999px;background:#fef3c7;color:#92400e}.ntec-ai-status.good{background:#dcfce7;color:#166534}.ntec-ai-status.bad{background:#fee2e2;color:#991b1b}.ntec-ai-history{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.ntec-ai-history h4{margin:0 0 8px}.ntec-ai-history table{width:100%;border-collapse:collapse;font-size:12px}.ntec-ai-history th,.ntec-ai-history td{text-align:left;padding:7px;border-bottom:1px solid var(--line);vertical-align:top}.ntec-ai-history th{color:var(--muted);font-weight:600}.ntec-ai-history .muted{color:var(--muted)}.ntec-price-autocomplete{position:fixed;z-index:100000;max-height:320px;overflow:auto;background:#fff;border:1px solid #cbd5e1;border-radius:9px;box-shadow:0 12px 35px #0f172a25;color:#0f172a}.ntec-price-autocomplete button{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;border:0;border-bottom:1px solid #e2e8f0;background:#fff;padding:10px 12px;cursor:pointer;color:inherit}.ntec-price-autocomplete button:hover,.ntec-price-autocomplete button:focus{background:#f1f5f9}.ntec-price-autocomplete strong{font-size:13px}.ntec-price-autocomplete small{font-size:11px;color:#64748b;white-space:normal;line-height:1.35}.ntec-price-autocomplete .ntec-ref-norm{color:#1e3a5f;background:#eff6ff;border-radius:5px;padding:4px 6px}.ntec-price-autocomplete .ntec-ref-norm b{font-size:10px}.ntec-price-autocomplete .ntec-ref-note{color:#475569}.ntec-price-autocomplete b{font-size:12px}@media(max-width:720px){.ntec-ai-result .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.ntec-ai-actions>*{max-width:100%}}';
   document.head.appendChild(st);
   $('ntec-ai-index').addEventListener('change',syncIndexRate);
   $('ntec-ai-item').addEventListener('change',()=>selectItem($('ntec-ai-item').value));
@@ -122,7 +122,7 @@ runtime = r'''<script>
  function renderOptions(keepId){
   const select=$('ntec-ai-item');if(!select)return;
   const active=rows.filter(r=>r.is_active);
-  select.innerHTML='<option value="">Selecione um item cadastrado…</option>'+active.map(r=>'<option value="'+esc(r.id)+'">'+esc((r.item_code?r.item_code+' · ':'')+r.item_name+' — '+r.category+' ('+r.unit+')'+(r.price_label?' ['+r.price_label+']':''))+'</option>').join('');
+  select.innerHTML='<option value="">Selecione um item cadastrado…</option>'+active.map(r=>'<option value="'+esc(r.id)+'">'+esc((r.item_code?r.item_code+' · ':'')+r.item_name+' — '+r.category+' ('+r.unit+')'+(r.normative_references?' — '+r.normative_references:'')+(r.price_label?' ['+r.price_label+']':''))+'</option>').join('');
   if(keepId&&active.some(r=>String(r.id)===String(keepId)))select.value=keepId;
  }
  async function loadRefs(){
@@ -269,7 +269,7 @@ runtime = r'''<script>
  function showPopup(input,items){
   const p=createPopup();activeInput=input;
   if(!items.length){closePopup();return}
-  p.innerHTML=items.map((r,i)=>'<button type="button" data-ntec-ref-pick="'+i+'"><strong>'+esc(r.item_name)+'</strong><small>'+esc([r.item_code,r.category,r.unit].filter(Boolean).join(' · '))+'</small><b>'+(r.price_label?esc(r.price_label)+' · valor numérico '+money(r.reference_price):money(r.reference_price))+'</b></button>').join('');
+  p.innerHTML=items.map((r,i)=>'<button type="button" data-ntec-ref-pick="'+i+'"><strong>'+esc(r.item_name)+'</strong><small>'+esc([r.item_code,r.category,r.unit].filter(Boolean).join(' · '))+'</small><small class="ntec-ref-norm"><b>VÍNCULO NORMATIVO:</b> '+esc(r.normative_references||'NBR a definir conforme método e escopo')+'</small>'+(r.normative_note?'<small class="ntec-ref-note">'+esc(r.normative_note)+'</small>':'')+'<b>'+(r.price_label?esc(r.price_label)+' · valor numérico '+money(r.reference_price):money(r.reference_price))+'</b></button>').join('');
   p.style.display='block';
   const rect=input.getBoundingClientRect(),left=Math.max(8,Math.min(rect.left,window.innerWidth-340));
   p.style.left=left+'px';p.style.top=Math.min(rect.bottom+3,window.innerHeight-280)+'px';p.style.width=Math.min(Math.max(rect.width,320),window.innerWidth-left-8)+'px';
@@ -283,20 +283,24 @@ runtime = r'''<script>
  }
  function pickReference(input,item){
   const row=input.closest('tr');if(!row||!item)return;
-  input.dataset.ntecPickingRef='1';setInput(input,item.item_name);delete input.dataset.ntecPickingRef;
+  const normPrefix=String(item.normative_references||'').trim();input.dataset.ntecPickingRef='1';setInput(input,(normPrefix?normPrefix+' — ':'')+item.item_name);delete input.dataset.ntecPickingRef;
   const unit=row.querySelector('[data-line-field="unit"],.ntec-line-unit,input[name="unit"]');
   const price=row.querySelector('[data-line-field="unit_price"],input[name="unit_price"],.ntec-line-price,[data-field="unit_price"]');
   if(unit)setInput(unit,item.unit||'serviço');
   if(price)setInput(price,Number(item.reference_price||0).toFixed(2));
   row.dataset.referenceValueId=item.id;
-  input.title=item.price_label?'Valor textual na referência: '+item.price_label+'. Confirme antes de enviar a proposta.':'Preço preenchido pela tabela de referência. Confirme quantidade e condições.';
+  row.dataset.normativeReferences=String(item.normative_references||'');
+  row.dataset.normativeNote=String(item.normative_note||'');
+  const normLabel=row.querySelector('[data-line-norm]');if(normLabel)normLabel.textContent=normPrefix?'NORMAS/REFERÊNCIAS: '+normPrefix:'Norma específica a confirmar conforme método e escopo contratado.';
+  const normNote=row.querySelector('[data-line-norm-note]');if(normNote)normNote.textContent=String(item.normative_note||'');
+  input.title=(normPrefix?'Referência normativa associada: '+normPrefix+'. ':'')+(item.price_label?'Valor textual na referência: '+item.price_label+'. Confirme antes de enviar a proposta.':'Preço preenchido pela tabela de referência. Confirme quantidade e condições.');
   closePopup();
  }
  function wireAutocomplete(){
   document.addEventListener('input',e=>{
    if(!descriptionInput(e.target))return;
    if(e.target.dataset.ntecPickingRef==='1')return;
-   const changedRow=e.target.closest('tr');if(changedRow)delete changedRow.dataset.referenceValueId;
+   const changedRow=e.target.closest('tr');if(changedRow){delete changedRow.dataset.referenceValueId;delete changedRow.dataset.normativeReferences;delete changedRow.dataset.normativeNote;const nl=changedRow.querySelector('[data-line-norm]');if(nl)nl.textContent='Selecione um item do catálogo para associar a norma aplicável.';const nn=changedRow.querySelector('[data-line-norm-note]');if(nn)nn.textContent='';}
    const q=e.target.value.trim();
    if(q.length<2){closePopup();return}
    showPopup(e.target,matchingRows(q));
@@ -331,7 +335,7 @@ runtime = r'''<script>
    '<div class="ntec-composition-total"><div><span>Subtotal</span><strong id="ntec-composition-subtotal">R$ 0,00</strong></div><div><span>Descontos</span><strong id="ntec-composition-discounts">R$ 0,00</strong></div><div class="grand"><span>Total da proposta</span><strong id="ntec-composition-total">R$ 0,00</strong></div></div>'+
    '<p class="footnote">Os itens são salvos em Supabase ligados à proposta. Se você remover um item e salvar, ele também será removido da composição daquela proposta. O valor total da proposta é recalculado. Itens de propostas aprovadas/enviadas ficam somente para consulta.</p>';
   const style=document.createElement('style');style.id='ntec-composition-style';
-  style.textContent='#ntec-composition-panel{border:1px solid var(--line);border-radius:12px}#ntec-composition-panel .ntec-composition-context{padding:10px;border:1px solid var(--line);border-radius:8px;min-height:20px;font-size:13px;line-height:1.5}#ntec-composition-panel .ntec-composition-total{margin:12px 0 0 auto;max-width:360px;border:1px solid var(--line);border-radius:9px;padding:12px 15px;display:grid;gap:9px}#ntec-composition-panel .ntec-composition-total>div{display:flex;justify-content:space-between;gap:18px}#ntec-composition-panel .ntec-composition-total span{color:var(--muted)}#ntec-composition-panel .ntec-composition-total .grand{border-top:1px solid var(--line);padding-top:10px;font-size:16px}#ntec-composition-panel .ntec-composition-total .grand strong{font-size:20px}#ntec-composition-panel .ntec-line-items-table{min-width:900px}#ntec-composition-panel .ntec-line-items-table input{width:100%;min-width:68px;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}#ntec-composition-panel .ntec-line-description{min-width:220px}#ntec-composition-panel .ntec-line-unit{min-width:82px}@media(max-width:700px){#ntec-composition-panel .ntec-composition-total{max-width:none}}';
+  style.textContent='#ntec-composition-panel{border:1px solid var(--line);border-radius:12px}#ntec-composition-panel .ntec-composition-context{padding:10px;border:1px solid var(--line);border-radius:8px;min-height:20px;font-size:13px;line-height:1.5}#ntec-composition-panel .ntec-composition-total{margin:12px 0 0 auto;max-width:360px;border:1px solid var(--line);border-radius:9px;padding:12px 15px;display:grid;gap:9px}#ntec-composition-panel .ntec-composition-total>div{display:flex;justify-content:space-between;gap:18px}#ntec-composition-panel .ntec-composition-total span{color:var(--muted)}#ntec-composition-panel .ntec-composition-total .grand{border-top:1px solid var(--line);padding-top:10px;font-size:16px}#ntec-composition-panel .ntec-composition-total .grand strong{font-size:20px}#ntec-composition-panel .ntec-line-items-table{min-width:900px}#ntec-composition-panel .ntec-line-items-table input{width:100%;min-width:68px;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}#ntec-composition-panel .ntec-line-description{min-width:220px}#ntec-composition-panel .ntec-line-norm,#ntec-composition-panel .ntec-line-norm-note{display:block;font-size:11px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;margin-top:4px;color:var(--muted)}#ntec-composition-panel .ntec-line-norm{color:#1d4f91;font-weight:600}#ntec-composition-panel .ntec-line-norm-note{font-weight:400}#ntec-composition-panel .ntec-line-unit{min-width:82px}@media(max-width:700px){#ntec-composition-panel .ntec-composition-total{max-width:none}}';
   document.head.appendChild(style);section.appendChild(box);
   $('ntec-composition-proposal').addEventListener('change',e=>{
    const next=e.target.value;
@@ -445,7 +449,8 @@ runtime = r'''<script>
    const priceLabel=String(ref.price_label||'').trim();
    const lineNormText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[normText]).join('; ');
    const description=lineNormText+' — '+ref.item_name;
-   addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id});
+   const lineNormText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||ref.normative_references||[normText]).join?((template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[ref.normative_references||normText]).join('; ')):(ref.normative_references||normText);
+   addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id,normative_references:lineNormText,normative_note:template.warning});
    existing.add(String(ref.id));added++;
   }
   compositionDirty=compositionDirty||added>0;updateCompositionTotals();
@@ -455,7 +460,8 @@ runtime = r'''<script>
  function fmtQty(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3})}
  function compositionLineHtml(item){
   const qty=item.quantity==null?1:item.quantity,discount=item.discount_percent==null?0:item.discount_percent,unitPrice=item.unit_price==null?'':item.unit_price;
-  return '<tr data-composition-line="1"><td><input class="ntec-line-description" data-line-field="description" aria-label="Descrição do item" maxlength="500" value="'+esc(item.description||'')+'" placeholder="Digite para buscar na referência" required/></td>'+
+  const normative=String(item.normative_references||'').trim(),normNote=String(item.normative_note||'').trim();
+  return '<tr data-composition-line="1"><td><div class="ntec-composition-description"><input class="ntec-line-description" data-line-field="description" aria-label="Descrição do item" maxlength="500" value="'+esc(item.description||'')+'" placeholder="Digite para buscar na referência" required/><small class="ntec-line-norm" data-line-norm>'+(normative?'NORMAS/REFERÊNCIAS: '+esc(normative):'Selecione um item do catálogo para associar a norma aplicável.')+'</small><small class="ntec-line-norm-note" data-line-norm-note>'+esc(normNote)+'</small></div></td>'+
    '<td><input data-line-field="quantity" aria-label="Quantidade" type="number" min="0.001" step="0.001" value="'+esc(qty)+'" required/></td>'+
    '<td><input class="ntec-line-unit" data-line-field="unit" aria-label="Unidade" maxlength="40" value="'+esc(item.unit||'serviço')+'" required/></td>'+
    '<td><input data-line-field="unit_price" aria-label="Preço unitário" type="number" min="0" step="0.01" value="'+esc(unitPrice)+'" required/></td>'+
@@ -469,6 +475,8 @@ runtime = r'''<script>
   const row=body.lastElementChild;
   if(item?.id)row.dataset.lineId=item.id;
   if(item?.reference_value_id)row.dataset.referenceValueId=item.reference_value_id;
+  if(item?.normative_references)row.dataset.normativeReferences=item.normative_references;
+  if(item?.normative_note)row.dataset.normativeNote=item.normative_note;
   row.querySelectorAll('[data-line-field]').forEach(el=>el.addEventListener('input',()=>{compositionDirty=true;updateCompositionTotals()}));
   row.querySelector('.ntec-line-remove').addEventListener('click',()=>{row.remove();compositionDirty=true;updateCompositionTotals()});
   updateCompositionTotals();updateCompositionControls();
@@ -476,7 +484,7 @@ runtime = r'''<script>
  function readCompositionItems(){
   return [...document.querySelectorAll('#ntec-composition-body [data-composition-line]')].map(row=>{
    const v={};row.querySelectorAll('[data-line-field]').forEach(el=>v[el.dataset.lineField]=el.value);
-   return {id:row.dataset.lineId||undefined,reference_value_id:row.dataset.referenceValueId||null,description:String(v.description||'').trim(),quantity:Number(v.quantity),unit:String(v.unit||'').trim(),unit_price:Number(v.unit_price),discount_percent:Number(v.discount_percent||0)};
+   return {id:row.dataset.lineId||undefined,reference_value_id:row.dataset.referenceValueId||null,normative_references:String(row.dataset.normativeReferences||''),normative_note:String(row.dataset.normativeNote||''),description:String(v.description||'').trim(),quantity:Number(v.quantity),unit:String(v.unit||'').trim(),unit_price:Number(v.unit_price),discount_percent:Number(v.discount_percent||0)};
   });
  }
  function updateCompositionTotals(){
