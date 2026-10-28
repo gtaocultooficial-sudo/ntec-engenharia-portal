@@ -447,9 +447,10 @@ runtime = r'''<script>
    const ref=refRows[Number(checkbox.dataset.ntecNormRow)];if(!ref)continue;
    if(existing.has(String(ref.id))){skipped++;continue}
    const priceLabel=String(ref.price_label||'').trim();
-   const lineNormText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[normText]).join('; ');
+   const rule=template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)));
+   const normList=Array.isArray(rule?.normCodes)?rule.normCodes:(ref.normative_references?[ref.normative_references]:[normText]);
+   const lineNormText=normList.join('; ');
    const description=lineNormText+' — '+ref.item_name;
-   const lineNormText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||ref.normative_references||[normText]).join?((template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[ref.normative_references||normText]).join('; ')):(ref.normative_references||normText);
    addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id,normative_references:lineNormText,normative_note:template.warning});
    existing.add(String(ref.id));added++;
   }
