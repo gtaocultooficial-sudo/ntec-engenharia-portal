@@ -68,11 +68,10 @@ runtime = r'''<script>
  function sourceDate(item){
   const applied=(window.NTEC_PRICE_REVIEW_HISTORY||[]).find(r=>r.applied_to_reference&&r.applied_at);
   if(applied)return new Date(applied.applied_at);
-  if(/RG\s*28/i.test(item.source_reference||''))return new Date('2022-11-27T12:00:00');
   const created=item.created_at?new Date(item.created_at):null;
   const updated=item.updated_at?new Date(item.updated_at):null;
   const manuallyChanged=created&&updated&&!Number.isNaN(created.getTime())&&!Number.isNaN(updated.getTime())&&(updated.getTime()-created.getTime()>60000);
-  const raw=manuallyChanged?item.updated_at:(/RG\\s*28/i.test(item.source_reference||'')?'2022-11-27T12:00:00':(item.updated_at||item.created_at));
+  const raw=manuallyChanged?item.updated_at:(/RG\s*28/i.test(item.source_reference||'')?'2022-11-27T12:00:00':(item.updated_at||item.created_at));
   const d=raw?new Date(raw):new Date();
   return Number.isNaN(d.getTime())?new Date():d;
  }
