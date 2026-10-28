@@ -14,6 +14,8 @@ on:
       - 'apply_ntec_price_assistant.py'
       - 'supabase/migrations/20261028_proposal_price_reviews.sql'
       - 'supabase/migrations/20261028_reference_normative_links.sql'
+      - 'supabase/migrations/20261028_ntec_lab_scope.sql'
+      - 'supabase/migrations/20261028_ntec_scope_catalog_links.sql'
   workflow_dispatch:
 
 permissions:
@@ -89,6 +91,11 @@ jobs:
           grep -q "normative_references" _site/admin/index.html
           grep -q "VÍNCULO NORMATIVO" _site/admin/index.html
           grep -q "ABNT NBR 9603:2023" _site/admin/index.html
+          grep -q "Montar conjunto completo por norma" _site/admin/index.html
+          grep -q "Status de acreditação no escopo" _site/admin/index.html
+          grep -q "scope_accreditation_status" _site/admin/index.html
+          grep -q "DNIT 136/2018-ME" _site/admin/index.html
+          grep -q "ABNT NBR 7180:2025" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
