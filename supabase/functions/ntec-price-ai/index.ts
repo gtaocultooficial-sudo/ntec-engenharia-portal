@@ -189,14 +189,45 @@ Deno.serve(async (req: Request) => {
       }
     }
   }
-  const sourceMap = new Map<string, any>();
-  for (const source of [...(estimate.sources || []), ...annotations]) {
+  const normalizeSourceUrl = (value: string) => {
+    try {
+      const u = new URL(value);
+      u.hash = "";
+      u.search = "";
+      return (u.origin + u.pathname).replace(/\/$/, "").toLowerCase();
+    } catch {
+      return "";
+    }
+  };
+  // Only return sources actually cited in the Responses API web-search annotations.
+  // Model-suggested links that cannot be matched to a tool citation are discarded.
+  const citedByUrl = new Map<string, any>();
+  for (const source of annotations) {
     const url = String(source.url || "").trim();
-    if (/^https?:\/\//i.test(url) && !sourceMap.has(url)) sourceMap.set(url, {
-      title: String(source.title || url).slice(0, 220),
-      url,
-      summary: String(source.summary || "").slice(0, 500),
-    });
+    const key = normalizeSourceUrl(url);
+    if (/^https?:\/\//i.test(url) && key && !citedByUrl.has(key)) {
+      citedByUrl.set(key, {
+        title: String(source.title || url).slice(0, 220),
+        url,
+        summary: "",
+      });
+    }
+  }
+  const sourceMap = new Map<string, any>();
+  for (const suggestion of estimate.sources || []) {
+    const url = String(suggestion.url || "").trim();
+    const key = normalizeSourceUrl(url);
+    const citation = citedByUrl.get(key);
+    if (citation && !sourceMap.has(key)) {
+      sourceMap.set(key, {
+        ...citation,
+        title: String(suggestion.title || citation.title).slice(0, 220),
+        summary: String(suggestion.summary || "").slice(0, 500),
+      });
+    }
+  }
+  for (const [key, citation] of citedByUrl.entries()) {
+    if (!sourceMap.has(key)) sourceMap.set(key, citation);
   }
   const sources = [...sourceMap.values()].slice(0, 8);
   return json({
