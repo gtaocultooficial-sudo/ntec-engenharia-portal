@@ -64,6 +64,7 @@ runtime = r'''<script>
  const norm=v=>String(v||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
  const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v||0));
  let rows=[],selected=null,lastEstimate=null,lastSavedReview=null,busy=false,initialized=false,activeInput=null,popup=null;
+ let compositionProposals=[],activeCompositionProposal=null,compositionDirty=false,compositionBusy=false;
  function msg(t,error){const el=$('ntec-ai-message');if(el){el.textContent=t||'';el.style.color=error?'#b42318':'var(--muted)'}}
  function sourceDate(item){
   const applied=(window.NTEC_PRICE_REVIEW_HISTORY||[]).find(r=>r.applied_to_reference&&r.applied_at);
@@ -293,16 +294,143 @@ runtime = r'''<script>
   window.addEventListener('scroll',()=>{if(activeInput)closePopup()},true);
   window.addEventListener('resize',closePopup);
  }
+ function findProposalSection(){
+  return [...document.querySelectorAll('h1')].find(h=>norm(h.textContent).includes('propostas comerciais'));
+ }
+ function setCompositionMessage(text,error){
+  const el=$('ntec-composition-message');if(el){el.textContent=text||'';el.style.color=error?'#b42318':'var(--muted)'}
+ }
+ function ensureCompositionPanel(){
+  if($('ntec-composition-panel'))return true;
+  const heading=findProposalSection();if(!heading)return false;
+  const section=heading.closest('section');if(!section)return false;
+  const box=document.createElement('div');box.id='ntec-composition-panel';box.className='panel';box.style.cssText='margin:22px 0;padding:16px';
+  box.innerHTML='<div class="titleline"><div><h2>Demonstrativo de preços por item</h2><p class="sub">Monte a composição comercial da proposta com a tabela de referência. Ao selecionar um item, a unidade e o preço de referência são preenchidos; você pode ajustar antes de salvar.</p></div><button type="button" class="btn" id="ntec-composition-refresh">Atualizar propostas</button></div>'+
+   '<div class="formgrid"><div class="field"><label for="ntec-composition-proposal">Proposta para editar *</label><select id="ntec-composition-proposal"><option value="">Carregando propostas…</option></select><small class="muted small">A composição só pode ser alterada enquanto a proposta estiver em rascunho ou revisão.</small></div><div class="field"><label>Cliente / situação</label><div id="ntec-composition-context" class="ntec-composition-context">Selecione uma proposta.</div></div></div>'+
+   '<div class="tablewrap"><table class="ntec-pg-table ntec-line-items-table"><thead><tr><th>Descrição do item / serviço</th><th>Qtd.</th><th>Unidade</th><th>Preço unitário (R$)</th><th>Desconto %</th><th>Total do item (R$)</th><th></th></tr></thead><tbody id="ntec-composition-body"><tr><td colspan="7" class="empty">Selecione uma proposta para carregar a composição.</td></tr></tbody></table></div>'+
+   '<div class="ntec-ai-actions"><button class="btn" id="ntec-composition-add" type="button">+ Adicionar item</button><button class="btn primary" id="ntec-composition-save" type="button" disabled>Salvar demonstrativo e atualizar total</button><span id="ntec-composition-message" role="status" aria-live="polite"></span></div>'+
+   '<div class="ntec-composition-total"><div><span>Subtotal</span><strong id="ntec-composition-subtotal">R$ 0,00</strong></div><div><span>Descontos</span><strong id="ntec-composition-discounts">R$ 0,00</strong></div><div class="grand"><span>Total da proposta</span><strong id="ntec-composition-total">R$ 0,00</strong></div></div>'+
+   '<p class="footnote">Os itens são salvos em Supabase ligados à proposta. Se você remover um item e salvar, ele também será removido da composição daquela proposta. O valor total da proposta é recalculado. Itens de propostas aprovadas/enviadas ficam somente para consulta.</p>';
+  const style=document.createElement('style');style.id='ntec-composition-style';
+  style.textContent='#ntec-composition-panel{border:1px solid var(--line);border-radius:12px}#ntec-composition-panel .ntec-composition-context{padding:10px;border:1px solid var(--line);border-radius:8px;min-height:20px;font-size:13px;line-height:1.5}#ntec-composition-panel .ntec-composition-total{margin:12px 0 0 auto;max-width:360px;border:1px solid var(--line);border-radius:9px;padding:12px 15px;display:grid;gap:9px}#ntec-composition-panel .ntec-composition-total>div{display:flex;justify-content:space-between;gap:18px}#ntec-composition-panel .ntec-composition-total span{color:var(--muted)}#ntec-composition-panel .ntec-composition-total .grand{border-top:1px solid var(--line);padding-top:10px;font-size:16px}#ntec-composition-panel .ntec-composition-total .grand strong{font-size:20px}#ntec-composition-panel .ntec-line-items-table{min-width:900px}#ntec-composition-panel .ntec-line-items-table input{width:100%;min-width:68px;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}#ntec-composition-panel .ntec-line-description{min-width:220px}#ntec-composition-panel .ntec-line-unit{min-width:82px}@media(max-width:700px){#ntec-composition-panel .ntec-composition-total{max-width:none}}';
+  document.head.appendChild(style);section.appendChild(box);
+  $('ntec-composition-proposal').addEventListener('change',e=>{
+   const next=e.target.value;
+   if(compositionDirty&&!confirm('Existem alterações não salvas neste demonstrativo. Descartar e carregar outra proposta?')){e.target.value=activeCompositionProposal?.id||'';return}
+   loadCompositionList(true,next);
+  });
+  $('ntec-composition-refresh').addEventListener('click',()=>loadCompositionList(true,activeCompositionProposal?.id||null));
+  $('ntec-composition-add').addEventListener('click',()=>addCompositionLine({}));
+  $('ntec-composition-save').addEventListener('click',saveComposition);
+  return true;
+ }
+ function compositionEditable(p){return Boolean(p&&['rascunho','em_revisao'].includes(p.status))}
+ function fmtQty(v){return Number(v||0).toLocaleString('pt-BR',{maximumFractionDigits:3})}
+ function compositionLineHtml(item){
+  const qty=item.quantity==null?1:item.quantity,discount=item.discount_percent==null?0:item.discount_percent,unitPrice=item.unit_price==null?'':item.unit_price;
+  return '<tr data-composition-line="1"><td><input class="ntec-line-description" data-line-field="description" aria-label="Descrição do item" maxlength="500" value="'+esc(item.description||'')+'" placeholder="Digite para buscar na referência" required/></td>'+
+   '<td><input data-line-field="quantity" aria-label="Quantidade" type="number" min="0.001" step="0.001" value="'+esc(qty)+'" required/></td>'+
+   '<td><input class="ntec-line-unit" data-line-field="unit" aria-label="Unidade" maxlength="40" value="'+esc(item.unit||'serviço')+'" required/></td>'+
+   '<td><input data-line-field="unit_price" aria-label="Preço unitário" type="number" min="0" step="0.01" value="'+esc(unitPrice)+'" required/></td>'+
+   '<td><input data-line-field="discount_percent" aria-label="Desconto percentual" type="number" min="0" max="100" step="0.01" value="'+esc(discount)+'" required/></td>'+
+   '<td class="ntec-line-total" data-composition-line-total>R$ 0,00</td><td><button type="button" class="ntec-line-remove" aria-label="Remover item">×</button></td></tr>';
+ }
+ function addCompositionLine(item){
+  const body=$('ntec-composition-body');if(!body||!compositionEditable(activeCompositionProposal)||compositionBusy)return;
+  const empty=body.querySelector('[data-composition-empty]');if(empty)body.innerHTML='';
+  body.insertAdjacentHTML('beforeend',compositionLineHtml(item||{}));
+  const row=body.lastElementChild;
+  if(item?.id)row.dataset.lineId=item.id;
+  if(item?.reference_value_id)row.dataset.referenceValueId=item.reference_value_id;
+  row.querySelectorAll('[data-line-field]').forEach(el=>el.addEventListener('input',()=>{compositionDirty=true;updateCompositionTotals()}));
+  row.querySelector('.ntec-line-remove').addEventListener('click',()=>{row.remove();compositionDirty=true;updateCompositionTotals()});
+  updateCompositionTotals();updateCompositionControls();
+ }
+ function readCompositionItems(){
+  return [...document.querySelectorAll('#ntec-composition-body [data-composition-line]')].map(row=>{
+   const v={};row.querySelectorAll('[data-line-field]').forEach(el=>v[el.dataset.lineField]=el.value);
+   return {id:row.dataset.lineId||undefined,reference_value_id:row.dataset.referenceValueId||null,description:String(v.description||'').trim(),quantity:Number(v.quantity),unit:String(v.unit||'').trim(),unit_price:Number(v.unit_price),discount_percent:Number(v.discount_percent||0)};
+  });
+ }
+ function updateCompositionTotals(){
+  const body=$('ntec-composition-body');if(!body)return;
+  let subtotal=0,discount=0,total=0;
+  [...body.querySelectorAll('[data-composition-line]')].forEach(row=>{
+   const v={};row.querySelectorAll('[data-line-field]').forEach(el=>v[el.dataset.lineField]=el.value);
+   const gross=Math.round(Number(v.quantity||0)*Number(v.unit_price||0)*100)/100;
+   const disc=Math.round(gross*Number(v.discount_percent||0))/100;
+   const line=Math.round(gross*(1-Number(v.discount_percent||0)/100)*100)/100;
+   subtotal+=gross;discount+=disc;total+=line;
+   const cell=row.querySelector('[data-composition-line-total]');if(cell)cell.textContent=money(line);
+  });
+  $('ntec-composition-subtotal').textContent=money(Math.round(subtotal*100)/100);
+  $('ntec-composition-discounts').textContent=money(Math.round(discount*100)/100);
+  $('ntec-composition-total').textContent=money(Math.round(total*100)/100);
+  updateCompositionControls();
+ }
+ function updateCompositionControls(){
+  const editable=compositionEditable(activeCompositionProposal);
+  const totalRows=[...document.querySelectorAll('#ntec-composition-body [data-composition-line]')].length;
+  const save=$('ntec-composition-save'),add=$('ntec-composition-add');
+  if(save)save.disabled=!editable||compositionBusy||!compositionDirty||!totalRows;
+  if(add)add.disabled=!editable||compositionBusy;
+  document.querySelectorAll('#ntec-composition-body [data-line-field],#ntec-composition-body .ntec-line-remove').forEach(el=>{el.disabled=!editable||compositionBusy});
+ }
+ function renderComposition(){
+  const body=$('ntec-composition-body');if(!body)return;
+  const p=activeCompositionProposal,editable=compositionEditable(p);
+  $('ntec-composition-context').innerHTML=p?'<strong>'+esc(p.clients?.company_name||'Cliente não informado')+'</strong><br>'+esc(p.proposal_number||'Proposta sem número')+' · '+esc(p.status)+' · Total salvo: <strong>'+money(p.amount||0)+'</strong>':'Selecione uma proposta.';
+  if(!p){body.innerHTML='<tr data-composition-empty="1"><td colspan="7" class="empty">Selecione uma proposta para carregar a composição.</td></tr>'}
+  else if(!p.items?.length){body.innerHTML='<tr data-composition-empty="1"><td colspan="7" class="empty">Nenhum item cadastrado nesta proposta. Clique em “Adicionar item”.</td></tr>'}
+  else{body.innerHTML='';p.items.forEach(item=>addCompositionLine(item))}
+  compositionDirty=false;updateCompositionTotals();updateCompositionControls();
+  setCompositionMessage(p?(editable?'Rascunho carregado. Adicione ou ajuste os itens e salve.':'Proposta em modo de consulta. A composição está bloqueada.'):'Nenhuma proposta disponível.',false);
+ }
+ async function loadCompositionList(force=false,desiredId=null){
+  if(!ensureCompositionPanel())return;
+  if(!api()?.loadProposalPricing){setCompositionMessage('A lista está aguardando a conexão administrativa. Entre como administrador e atualize.',true);return}
+  setCompositionMessage('Carregando propostas e composições…');
+  try{
+   const previous=desiredId||activeCompositionProposal?.id||$('ntec-composition-proposal')?.value||'';
+   compositionProposals=await api().loadProposalPricing();
+   if(api()?.loadProposalReferenceValues){window.NTEC_PRICE_REFERENCE_CACHE=await api().loadProposalReferenceValues()}
+   const select=$('ntec-composition-proposal');
+   select.innerHTML=compositionProposals.length?compositionProposals.map(p=>'<option value="'+esc(p.id)+'" '+(compositionEditable(p)?'':'disabled')+'>'+esc(p.proposal_number||'Proposta')+' · '+esc(p.clients?.company_name||'Cliente')+' · '+esc(p.status)+'</option>').join(''):'<option value="">Nenhuma proposta cadastrada</option>';
+   let choice=compositionProposals.find(p=>String(p.id)===String(previous))||compositionProposals.find(compositionEditable)||compositionProposals[0]||null;
+   activeCompositionProposal=choice;select.value=choice?.id||'';
+   renderComposition();
+  }catch(e){setCompositionMessage('Não foi possível carregar as propostas: '+(e?.message||'erro desconhecido'),true)}
+ }
+ async function saveComposition(){
+  if(compositionBusy)return;
+  if(!activeCompositionProposal||!compositionEditable(activeCompositionProposal)){setCompositionMessage('Selecione uma proposta em rascunho ou revisão.',true);return}
+  const items=readCompositionItems();
+  if(!items.length){setCompositionMessage('Adicione ao menos um item antes de salvar.',true);return}
+  for(let i=0;i<items.length;i++){
+   const item=items[i];
+   if(!item.description||!item.unit||!Number.isFinite(item.quantity)||item.quantity<=0||!Number.isFinite(item.unit_price)||item.unit_price<0||!Number.isFinite(item.discount_percent)||item.discount_percent<0||item.discount_percent>100){setCompositionMessage('Confira descrição, quantidade, unidade, preço e desconto no item '+(i+1)+'.',true);return}
+  }
+  if(!confirm('Salvar a composição de preços e atualizar o total da proposta '+(activeCompositionProposal.proposal_number||'selecionada')+'?'))return;
+  compositionBusy=true;updateCompositionControls();setCompositionMessage('Salvando demonstrativo…');
+  try{
+   const saved=await api().saveProposalPricing({proposal_id:activeCompositionProposal.id,items});
+   await loadCompositionList(true,activeCompositionProposal.id);
+   setCompositionMessage('Demonstrativo salvo. Total atualizado para '+money(saved.total)+'.');
+  }catch(e){setCompositionMessage('Não foi possível salvar o demonstrativo: '+(e?.message||'erro'),true)}
+  finally{compositionBusy=false;updateCompositionControls()}
+ }
+
  function init(){
   if(initialized)return;
-  if(!ensureAssistant()){const observer=new MutationObserver(()=>{if(ensureAssistant()){observer.disconnect();bind()}});observer.observe(document.body,{childList:true,subtree:true});return}
+  if(!ensureAssistant()||!ensureCompositionPanel()){const observer=new MutationObserver(()=>{if(ensureAssistant()&&ensureCompositionPanel()){observer.disconnect();bind()}});observer.observe(document.body,{childList:true,subtree:true});return}
   bind();
  }
  function bind(){
   if(initialized)return;initialized=true;wireAutocomplete();
-  const retry=setInterval(()=>{if(api()?.loadProposalReferenceValues&&api()?.loadProposalPriceReviews){clearInterval(retry);loadRefs()}},400);
-  if(api()?.loadProposalReferenceValues&&api()?.loadProposalPriceReviews){clearInterval(retry);loadRefs()}
-  document.querySelectorAll('#nav button').forEach(b=>b.addEventListener('click',()=>{if($('ntec-ref-price-panel'))loadRefs()}));
+  const ready=()=>api()?.loadProposalReferenceValues&&api()?.loadProposalPriceReviews&&api()?.loadProposalPricing&&api()?.saveProposalPricing;
+  const retry=setInterval(()=>{if(ready()){clearInterval(retry);loadRefs();loadCompositionList(true)}},400);
+  if(ready()){clearInterval(retry);loadRefs();loadCompositionList(true)}
+  document.querySelectorAll('#nav button').forEach(b=>b.addEventListener('click',()=>{if($('ntec-ref-price-panel'))loadRefs();if(findProposalSection())loadCompositionList(true)}));
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
