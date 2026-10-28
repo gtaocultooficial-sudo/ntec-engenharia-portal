@@ -69,7 +69,10 @@ runtime = r'''<script>
   const applied=(window.NTEC_PRICE_REVIEW_HISTORY||[]).find(r=>r.applied_to_reference&&r.applied_at);
   if(applied)return new Date(applied.applied_at);
   if(/RG\s*28/i.test(item.source_reference||''))return new Date('2022-11-27T12:00:00');
-  const raw=item.updated_at||item.created_at;
+  const created=item.created_at?new Date(item.created_at):null;
+  const updated=item.updated_at?new Date(item.updated_at):null;
+  const manuallyChanged=created&&updated&&!Number.isNaN(created.getTime())&&!Number.isNaN(updated.getTime())&&(updated.getTime()-created.getTime()>60000);
+  const raw=manuallyChanged?item.updated_at:(/RG\\s*28/i.test(item.source_reference||'')?'2022-11-27T12:00:00':(item.updated_at||item.created_at));
   const d=raw?new Date(raw):new Date();
   return Number.isNaN(d.getTime())?new Date():d;
  }
@@ -86,13 +89,13 @@ runtime = r'''<script>
   box.innerHTML='<div class="titleline"><div><h3>Assistente inteligente de precificação</h3><p class="sub">Revise os valores antigos, estime um reajuste anual e registre a decisão antes de alterar a tabela oficial.</p></div><span class="ntec-ai-tag">Revisão humana obrigatória</span></div>'+
    '<div class="ntec-ai-disclaimer">A estimativa abaixo aplica o índice escolhido ao preço-base e cria uma faixa de tolerância configurável. É um alerta de atualização de custos, não uma pesquisa automática de cotações concorrentes. Confirme valores reais de fornecedores, mão de obra, deslocamento e equipamentos antes de aprovar.</div>'+
    '<div class="formgrid"><div class="field"><label for="ntec-ai-item">Item da tabela de referência *</label><select id="ntec-ai-item"><option value="">Carregando itens…</option></select></div>'+
-   '<div class="field"><label for="ntec-ai-index">Índice anual de reajuste</label><select id="ntec-ai-index"><option value="INCC-M" data-rate="6.75" data-period="out/2026" data-url="https://portal.fgv.br/noticias/incc-m-outubro-2026">INCC-M · 6,75% · out/2026 (FGV)</option><option value="IPCA" data-rate="4.58" data-period="set/2026" data-url="https://www.ibge.gov.br/indicadores/inflacao">IPCA · 4,58% · set/2026 (IBGE)</option><option value="personalizado" data-rate="" data-period="informado pelo administrador" data-url="">Personalizado — informar percentual</option></select></div>'+
+   '<div class="field"><label for="ntec-ai-index">Índice anual de reajuste</label><select id="ntec-ai-index"><option value="INCC-M" data-rate="6.75" data-period="out/2026" data-url="https://portal.fgv.br/noticias/incc-m-outubro-2026">INCC-M · 6,75% · out/2026 (FGV)</option><option value="IPCA" data-rate="4.58" data-period="set/2026" data-url="https://www.ibge.gov.br/indicadores/inflacao">IPCA · 4,58% · set/2026 (IBGE)</option><option value="SINAPI" data-rate="6.81" data-period="set/2026" data-url="https://www.ibge.gov.br/indicadores/sinapi">SINAPI · 6,81% · 12 meses até set/2026 (IBGE)</option><option value="personalizado" data-rate="" data-period="informado pelo administrador" data-url="">Personalizado — informar percentual</option></select></div>'+
    '<div class="field"><label for="ntec-ai-rate">Percentual anual (%) *</label><input id="ntec-ai-rate" type="number" min="-20" max="100" step="0.01" value="6.75" required/><small class="muted small">INCC-M é um ponto de partida para custos de construção; avalie se o índice é adequado ao serviço.</small></div>'+
    '<div class="field"><label for="ntec-ai-band">Margem da faixa (%)</label><input id="ntec-ai-band" type="number" min="0" max="50" step="0.5" value="10" required/><small class="muted small">Ex.: 10% abaixo e acima do preço projetado.</small></div></div>'+
    '<div class="ntec-ai-actions"><button class="btn primary" id="ntec-ai-estimate" type="button">Estimar reajuste e comparar</button><button class="btn" id="ntec-ai-real-estimate" type="button">Pesquisar mercado com IA</button><button class="btn" id="ntec-ai-save" type="button" disabled>Salvar revisão anual</button><button class="btn hidden" id="ntec-ai-apply" type="button">Aplicar preço recomendado à tabela</button><span id="ntec-ai-message" role="status" aria-live="polite"></span></div>'+
    '<div id="ntec-ai-result" class="ntec-ai-result"><p>Selecione um item para revisar. A tabela original só será alterada após você salvar e aplicar uma recomendação.</p></div>'+
    '<div class="ntec-ai-history"><h4>Histórico de revisões do item</h4><div id="ntec-ai-history-body" class="muted small">Selecione um item para consultar as revisões anteriores.</div></div>'+
-   '<p class="footnote">Índices de partida verificados em 28/10/2026: <a href="https://portal.fgv.br/noticias/incc-m-outubro-2026" target="_blank" rel="noopener">INCC-M FGV — 6,75% acumulado em 12 meses (out/2026)</a> e <a href="https://www.ibge.gov.br/indicadores/inflacao" target="_blank" rel="noopener">IPCA IBGE — 4,58% acumulado em 12 meses (set/2026)</a>. Atualize o percentual quando sair uma nova divulgação e valide se o índice representa seus custos.</p>';
+   '<p class="footnote">Índices de partida verificados em 28/10/2026: <a href="https://portal.fgv.br/noticias/incc-m-outubro-2026" target="_blank" rel="noopener">INCC-M FGV — 6,75% acumulado em 12 meses (out/2026)</a> e <a href="https://www.ibge.gov.br/indicadores/inflacao" target="_blank" rel="noopener">IPCA IBGE — 4,58% acumulado em 12 meses (set/2026)</a> e <a href="https://www.ibge.gov.br/indicadores/sinapi" target="_blank" rel="noopener">SINAPI IBGE — custo do m², 6,81% em 12 meses (set/2026)</a>. Atualize o percentual quando sair uma nova divulgação e valide se o índice representa seus custos.</p>';
   const title=panel.querySelector('.titleline');
   panel.insertBefore(box,title?title.nextSibling:panel.firstChild);
   const st=document.createElement('style');st.id='ntec-price-ai-style';
@@ -158,9 +161,9 @@ runtime = r'''<script>
   const indexOpt=$('ntec-ai-index').selectedOptions[0],indexName=$('ntec-ai-index').value;
   const period=indexOpt?.dataset.period||'personalizado';
   if(item.price_label||!Number.isFinite(base)||base<=0){
-   lastEstimate={reference_value_id:item.id,item_name:item.item_name,item_code:item.item_code,category:item.category,unit:item.unit,base_price:Number.isFinite(base)?base:0,recommended_price:0,market_price_min:0,market_price_max:0,annual_adjustment_percent:rate,band_percent:band,index_name:indexName,index_period:period,years_elapsed:years,assessment:'sem_preco_numerico',notes:'O item contém valor textual ou não tem preço numérico positivo. Cadastre um preço base numérico antes de estimar.'};
-   $('ntec-ai-result').innerHTML='<p><strong>Não é possível estimar automaticamente este item.</strong> O cadastro tem valor textual ('+esc(item.price_label||'sem preço numérico')+') ou preço zero. Edite o item para informar um preço numérico antes de continuar.</p>';
-   $('ntec-ai-save').disabled=false;msg('Estimativa bloqueada: falta preço numérico.');
+   lastEstimate=null;
+   $('ntec-ai-result').innerHTML='<p><strong>Não é possível estimar automaticamente este item.</strong> O cadastro tem valor textual ('+esc(item.price_label||'sem preço numérico')+') ou preço zero. Edite o item para informar um preço-base numérico antes de continuar. Esse item não poderá receber recomendação de preço zero.</p>';
+   $('ntec-ai-save').disabled=true;$('ntec-ai-apply').classList.add('hidden');msg('Estimativa bloqueada: falta preço numérico.',true);
    return;
   }
   const factor=Math.pow(1+rate/100,years);
