@@ -40,6 +40,8 @@ update public.proposal_reference_values set normative_references='ABNT NBR 16868
 where category='Blocos & Bloquete e Artefatos' and section_name='ENSAIO DE RESISTENCIA À COMPRESSÃO DE PRISMA OCO/CHEIO' and item_code='6.3';
 update public.proposal_reference_values set normative_references='ABNT NBR 16868-3:2020',normative_note='Serviço auxiliar para ensaio de prismas. O status de acreditação aplica-se ao ensaio específico.',scope_accreditation_status='Serviço auxiliar — não é ensaio'
 where category='Blocos & Bloquete e Artefatos' and section_name='ENSAIO DE RESISTENCIA À COMPRESSÃO DE PRISMA OCO/CHEIO' and item_code in ('6.1','6.2');
+update public.proposal_reference_values set normative_references='ABNT NBR 16868-3:2020',normative_note='Serviço auxiliar para ensaio de prismas. O status de acreditação aplica-se ao ensaio específico.',scope_accreditation_status='Serviço auxiliar — não é ensaio'
+where category='Blocos & Bloquete e Artefatos' and section_name='ENSAIO DE RESISTENCIA À COMPRESSÃO DE PRISMA OCO/CHEIO' and item_code in ('6.1','6.2');
 
 -- Asphalt standards separated by method so different procedures are not conflated.
 update public.proposal_reference_values set normative_references='DNER-ME 043:1995',normative_note='Escopo NTEC: Marshall — Não acreditado, conforme documento fornecido.',scope_accreditation_status='Não acreditado'
