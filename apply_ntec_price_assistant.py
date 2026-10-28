@@ -197,7 +197,7 @@ runtime = r'''<script>
  }
  function createPopup(){
   if(popup)return popup;
-  popup=document.createElement('div');popup.className='ntec-price-autocomplete hidden';popup.style.display='none';document.body.appendChild(popup);return popup;
+  popup=document.createElement('div');popup.className='ntec-price-autocomplete';popup.style.display='none';document.body.appendChild(popup);return popup;
  }
  function closePopup(){if(popup){popup.style.display='none';popup.innerHTML=''}activeInput=null}
  function descriptionInput(el){
