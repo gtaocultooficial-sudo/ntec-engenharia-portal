@@ -346,7 +346,7 @@ runtime = r'''<script>
     {code:'ABNT NBR 16886:2020',text:'Amostragem de concreto fresco — referência somente se a coleta estiver contratada.'},
     {code:'ABNT NBR 12655:2015 + Emenda 1:2022',text:'Referência geral para preparo, controle, recebimento e aceitação do concreto; confirmar edição aplicável ao contrato.'}
    ],
-   rules:[{category:'Ensaios de Concreto',match:'moldagem de corpos de provas (concreto)',checked:true},{category:'Ensaios de Concreto',match:'ruptura axial de corpos de provas cilindricos',checked:true}],
+   rules:[{category:'Ensaios de Concreto',match:'moldagem de corpos de provas (concreto)',checked:true,normCodes:['ABNT NBR 5738:2015 (VC 2016)']},{category:'Ensaios de Concreto',match:'ruptura axial de corpos de provas cilindricos',checked:true,normCodes:['ABNT NBR 5739:2018']}],
    warning:'O catálogo atual marca a moldagem como “Incluso” e preço R$ 0,00. Antes de salvar, decida se o serviço será incluído sem cobrança ou se a tabela de referência deve receber um preço. O item de amostragem não será adicionado automaticamente porque não há item separado identificado para coleta no catálogo.'
   },
   concreto_moldagem:{
@@ -355,7 +355,7 @@ runtime = r'''<script>
     {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem e cura de corpos de prova de concreto.'},
     {code:'ABNT NBR 16886:2020 (condicional)',text:'Amostragem do concreto fresco, apenas quando a coleta fizer parte do escopo.'}
    ],
-   rules:[{category:'Ensaios de Concreto',match:'moldagem de corpos de provas (concreto)',checked:true}],
+   rules:[{category:'Ensaios de Concreto',match:'moldagem de corpos de provas (concreto)',checked:true,normCodes:['ABNT NBR 5738:2015 (VC 2016)']}],
    warning:'A tabela atual marca moldagem de concreto como “Incluso” (R$ 0,00). Confira se deve permanecer incluída na proposta ou se será precificada. A coleta/amostragem é uma atividade distinta.'
   },
   concreto_axial:{
@@ -364,7 +364,7 @@ runtime = r'''<script>
     {code:'ABNT NBR 5739:2018',text:'Ensaio de compressão de corpos de prova cilíndricos de concreto.'},
     {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Referência associada à moldagem/cura e rastreabilidade dos corpos de prova.'}
    ],
-   rules:[{category:'Ensaios de Concreto',match:'ruptura axial de corpos de provas cilindricos',checked:true}],
+   rules:[{category:'Ensaios de Concreto',match:'ruptura axial de corpos de provas cilindricos',checked:true,normCodes:['ABNT NBR 5739:2018']}],
    warning:'Confirme as dimensões (por exemplo, 10×20 cm ou 15×30 cm), idade de ruptura, identificação e rastreabilidade dos corpos de prova. A moldagem pode ser um item separado ou já estar incluída no contrato.'
   },
   concreto_diametral:{
@@ -373,7 +373,7 @@ runtime = r'''<script>
     {code:'ABNT NBR 7222:2011',text:'Determinação da resistência à tração por compressão diametral de corpos de prova cilíndricos.'},
     {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem/cura dos corpos de prova, quando fizer parte do procedimento contratado.'}
    ],
-   rules:[{category:'Ensaios de Concreto',match:'ruptura diametral de corpos de provas cilindricos',checked:true}],
+   rules:[{category:'Ensaios de Concreto',match:'ruptura diametral de corpos de provas cilindricos',checked:true,normCodes:['ABNT NBR 7222:2011']}],
    warning:'A ruptura diametral não é o mesmo serviço que a ruptura axial por compressão. Confirme que a solicitação do cliente é realmente tração por compressão diametral.'
   },
   concreto_flexao:{
@@ -382,7 +382,7 @@ runtime = r'''<script>
     {code:'ABNT NBR 12142:2010',text:'Determinação da resistência à tração na flexão de corpos de prova prismáticos de concreto.'},
     {code:'ABNT NBR 5738:2015 (Versão Corrigida 2016)',text:'Moldagem/cura dos corpos de prova prismáticos, conforme escopo.'}
    ],
-   rules:[{category:'Ensaios de Concreto',match:'ruptura tração na flexão',checked:true}],
+   rules:[{category:'Ensaios de Concreto',match:'ruptura tração na flexão',checked:true,normCodes:['ABNT NBR 12142:2010']}],
    warning:'Confirme a geometria do prisma e os pontos de carregamento previstos pelo método normativo e pelo laboratório.'
   },
   argamassa_moldagem:{
@@ -390,7 +390,7 @@ runtime = r'''<script>
    norms:[
     {code:'ABNT NBR 13279:2005',text:'Resistência à tração na flexão e à compressão de argamassa endurecida em corpos de prova prismáticos.'}
    ],
-   rules:[{category:'Ensaios de Argamassa',match:'moldagem de corpos de provas (argamassa)',checked:true}],
+   rules:[{category:'Ensaios de Argamassa',match:'moldagem de corpos de provas (argamassa)',checked:true,normCodes:['Referência a confirmar: ABNT NBR 13279:2005']}],
    warning:'A NBR 13279 trata de ensaios em corpos de prova prismáticos, tipicamente 4×4×16 cm. O item de ruptura axial cilíndrica 5×10 cm existente no catálogo não deve ser associado automaticamente a essa norma sem confirmação do método e da especificação do cliente.'
   },
   graute_moldagem_axial:{
@@ -399,7 +399,7 @@ runtime = r'''<script>
     {code:'Referência técnica a confirmar pelo projeto / especificação do graute',text:'O método de moldagem, cura e resistência deve ser definido pelo tipo de graute, geometria do corpo de prova e norma contratual.'},
     {code:'ABNT NBR 5738 / NBR 5739 — somente se explicitamente aplicáveis ao método contratado',text:'Não assumir automaticamente que o procedimento de concreto é aplicável ao graute sem validar a especificação técnica.'}
    ],
-   rules:[{category:'Ensaios de Graute',match:'moldagem de corpos de provas (graute)',checked:true},{category:'Ensaios de Graute',match:'ruptura axial de corpos de provas cilindricos',checked:true}],
+   rules:[{category:'Ensaios de Graute',match:'moldagem de corpos de provas (graute)',checked:true,normCodes:['Confirmar norma e geometria no projeto/especificação']},{category:'Ensaios de Graute',match:'ruptura axial de corpos de provas cilindricos',checked:true,normCodes:['Confirmar norma e geometria no projeto/especificação']}],
    warning:'Para graute, valide no projeto/especificação o corpo de prova, método de moldagem/cura, idade e ensaio de resistência. O portal deixará esses itens como sugestões para revisão, não como definição normativa automática.'
   }
  };
@@ -415,7 +415,7 @@ runtime = r'''<script>
    return row?{rule,index,row}:null;
   }).filter(Boolean);
   if(!found.length){items.innerHTML='<p class="muted small">Não localizei os itens correspondentes na tabela de referência. Você ainda pode usar a lista de normas, mas deverá cadastrar/selecionar o serviço manualmente.</p>';add.disabled=true;return}
-  items._ntecNormRows=found.map(x=>x.row);
+  items._ntecNormRows=[];found.forEach(({index,row})=>{items._ntecNormRows[index]=row});
   items.innerHTML=found.map(({rule,index,row})=>{
    const value=String(row.price_label||'').trim()||money(row.reference_price);
    return '<label style="display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" data-ntec-norm-row="'+index+'" '+(rule.checked?'checked':'')+' style="margin-top:4px"/><span><strong>'+esc(row.item_name)+'</strong><br/><span class="muted small">'+esc(row.category)+' · '+esc(row.unit)+' · Referência: '+esc(value)+'</span></span></label>';
@@ -435,7 +435,8 @@ runtime = r'''<script>
    const ref=refRows[Number(checkbox.dataset.ntecNormRow)];if(!ref)continue;
    if(existing.has(String(ref.id))){skipped++;continue}
    const priceLabel=String(ref.price_label||'').trim();
-   const description=ref.item_name+' — Norma(s): '+normText;
+   const normText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[normText]).join('; ');
+   const description=normText+' — '+ref.item_name;
    addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id});
    existing.add(String(ref.id));added++;
   }
