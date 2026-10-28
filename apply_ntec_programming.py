@@ -369,8 +369,21 @@ reference_values_runtime = r'''<script>
  let rows=[],editingId=null,initialized=false,busy=false;
  const $=id=>document.getElementById(id);
  function findHeading(){
-  return [...document.querySelectorAll('h1,h2,h3,h4,[role="heading"],.panel-title,.section-title')]
-   .find(el=>norm(el.textContent).includes('valores de referencia para proposta'));
+  const existing=[...document.querySelectorAll('h1,h2,h3,h4,[role="heading"],.panel-title,.section-title')]
+   .find(el=>el.id!=='ntec-ref-price-heading'&&norm(el.textContent).includes('valores de referencia para proposta'));
+  if(existing)return existing;
+  // The original portal did not include this heading. Mount the reference table
+  // inside the existing Propostas comerciais page, not in a new navigation tab.
+  const proposals=[...document.querySelectorAll('h1')].find(el=>norm(el.textContent)==='propostas comerciais');
+  if(!proposals)return null;
+  const section=proposals.closest('section');if(!section)return null;
+  let heading=section.querySelector('#ntec-ref-price-heading');
+  if(heading)return heading;
+  heading=document.createElement('h2');heading.id='ntec-ref-price-heading';heading.textContent='Valores de Referência para Proposta';
+  heading.style.marginTop='24px';
+  const intro=proposals.nextElementSibling&&proposals.nextElementSibling.tagName==='P'?proposals.nextElementSibling:proposals;
+  intro.insertAdjacentElement('afterend',heading);
+  return heading;
  }
  function setMsg(text,error=false){
   const el=$('ntec-ref-price-message');if(el){el.textContent=text||'';el.style.color=error?'#b42318':'var(--muted)'}
