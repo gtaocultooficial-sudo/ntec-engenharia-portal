@@ -267,7 +267,7 @@ runtime = r'''<script>
  }
  function pickReference(input,item){
   const row=input.closest('tr');if(!row||!item)return;
-  setInput(input,item.item_name);
+  input.dataset.ntecPickingRef='1';setInput(input,item.item_name);delete input.dataset.ntecPickingRef;
   const unit=row.querySelector('[data-line-field="unit"],.ntec-line-unit,input[name="unit"]');
   const price=row.querySelector('[data-line-field="unit_price"],input[name="unit_price"],.ntec-line-price,[data-field="unit_price"]');
   if(unit)setInput(unit,item.unit||'serviço');
@@ -279,6 +279,8 @@ runtime = r'''<script>
  function wireAutocomplete(){
   document.addEventListener('input',e=>{
    if(!descriptionInput(e.target))return;
+   if(e.target.dataset.ntecPickingRef==='1')return;
+   const changedRow=e.target.closest('tr');if(changedRow)delete changedRow.dataset.referenceValueId;
    const q=e.target.value.trim();
    if(q.length<2){closePopup();return}
    showPopup(e.target,matchingRows(q));
