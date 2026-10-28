@@ -435,8 +435,8 @@ runtime = r'''<script>
    const ref=refRows[Number(checkbox.dataset.ntecNormRow)];if(!ref)continue;
    if(existing.has(String(ref.id))){skipped++;continue}
    const priceLabel=String(ref.price_label||'').trim();
-   const normText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[normText]).join('; ');
-   const description=normText+' — '+ref.item_name;
+   const lineNormText=(template.rules.find(rule=>norm(rule.category)===norm(ref.category)&&norm(ref.item_name).includes(norm(rule.match)))?.normCodes||[normText]).join('; ');
+   const description=lineNormText+' — '+ref.item_name;
    addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id});
    existing.add(String(ref.id));added++;
   }
