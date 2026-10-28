@@ -13,6 +13,7 @@ on:
       - 'apply_ntec_programming.py'
       - 'apply_ntec_price_assistant.py'
       - 'supabase/migrations/20261028_proposal_price_reviews.sql'
+      - 'supabase/migrations/20261028_reference_normative_links.sql'
   workflow_dispatch:
 
 permissions:
@@ -85,6 +86,9 @@ jobs:
           grep -q "Demonstrativo de preços por item" _site/admin/index.html
           grep -q "Revisão anual" _site/admin/index.html
           grep -q "reference_value_id" _site/admin/index.html
+          grep -q "normative_references" _site/admin/index.html
+          grep -q "VÍNCULO NORMATIVO" _site/admin/index.html
+          grep -q "ABNT NBR 9603:2023" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
