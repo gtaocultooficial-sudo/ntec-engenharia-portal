@@ -363,12 +363,12 @@ runtime = r'''<script>
   return true;
  }
  function canonicalNormToken(raw){
-  let token=String(raw||'').trim().toUpperCase().replace(/\\s+/g,' ');
-  if(/^NBR\\b/i.test(token))token='ABNT '+token;
+  let token=String(raw||'').trim().toUpperCase().replace(/\s+/g,' ');
+  if(/^NBR\b/i.test(token))token='ABNT '+token;
   return token;
  }
  function extractNormTokens(text){
-  const found=String(text||'').match(/(?:ABNT\\s+)?NBR\\s+\\d+(?::\\d{4})?|DNER-PRO\\s+\\d+\\/\\d{2,4}/gi)||[];
+  const found=String(text||'').match(/(?:ABNT\s+)?NBR\s+\d+(?::\d{4})?|DNER-PRO\s+\d+\/\d{2,4}/gi)||[];
   return [...new Set(found.map(canonicalNormToken))];
  }
  function renderNormBundleOptions(){
@@ -379,7 +379,8 @@ runtime = r'''<script>
   const previous=select.value;
   select.innerHTML='<option value="">Selecione uma norma…</option>'+options.map(([token,count])=>'<option value="'+esc(token)+'">'+esc(token)+' · '+count+' serviço(s) vinculado(s)'+'</option>').join('');
   if(options.some(([token])=>token===previous))select.value=previous;
-  else{select.value='';renderNormBundleItems()}
+  else select.value='';
+  renderNormBundleItems();
  }
  function renderNormBundleItems(){
   const select=$('ntec-norm-bundle-standard'),box=$('ntec-norm-bundle-items'),button=$('ntec-norm-bundle-add');
@@ -617,6 +618,7 @@ runtime = r'''<script>
    let choice=compositionProposals.find(p=>String(p.id)===String(previous))||compositionProposals.find(compositionEditable)||compositionProposals[0]||null;
    activeCompositionProposal=choice;select.value=choice?.id||'';
    renderComposition();
+   updateNormBundleSummary();
   }catch(e){setCompositionMessage('Não foi possível carregar as propostas: '+(e?.message||'erro desconhecido'),true)}
  }
  async function saveComposition(){
