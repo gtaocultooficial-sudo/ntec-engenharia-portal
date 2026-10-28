@@ -540,7 +540,7 @@ runtime = r'''<script>
    const normList=Array.isArray(rule?.normCodes)?rule.normCodes:(ref.normative_references?[ref.normative_references]:[normText]);
    const lineNormText=normList.join('; ');
    const description=lineNormText+' — '+ref.item_name;
-   addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id,normative_references:lineNormText,normative_note:template.warning});
+   addCompositionLine({description,quantity:1,unit:(priceLabel.toLowerCase()==='incluso'?'serviço':ref.unit||'serviço'),unit_price:Number(ref.reference_price||0),discount_percent:0,reference_value_id:ref.id,normative_references:lineNormText,normative_note:template.warning,scope_accreditation_status:ref.scope_accreditation_status||'Status não cadastrado'});
    existing.add(String(ref.id));added++;
   }
   compositionDirty=compositionDirty||added>0;updateCompositionTotals();
