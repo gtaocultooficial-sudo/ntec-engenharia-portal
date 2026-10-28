@@ -93,6 +93,8 @@ jobs:
           grep -q "ABNT NBR 9603:2023" _site/admin/index.html
           grep -q "Montar conjunto completo por norma" _site/admin/index.html
           grep -q "Status de acreditação no escopo" _site/admin/index.html
+          grep -q "Ensaios no escopo informado para esta norma" _site/admin/index.html
+          grep -q "loadNtecLabScope" _site/admin/index.html
           grep -q "scope_accreditation_status" _site/admin/index.html
           grep -q "DNIT 136/2018-ME" _site/admin/index.html
           grep -q "ABNT NBR 7180:2025" _site/admin/index.html
