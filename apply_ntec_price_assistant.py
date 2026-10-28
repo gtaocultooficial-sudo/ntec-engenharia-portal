@@ -131,7 +131,7 @@ runtime = r'''<script>
  }
  async function loadRefs(){
   if(!api()?.loadProposalReferenceValues)return;
-  try{rows=await api().loadProposalReferenceValues();window.NTEC_PRICE_REFERENCE_CACHE=rows;renderOptions(selected?.id);await selectItem($('ntec-ai-item')?.value||'')}
+  try{rows=await api().loadProposalReferenceValues();window.NTEC_PRICE_REFERENCE_CACHE=rows;renderOptions(selected?.id);renderNormBundleOptions();await selectItem($('ntec-ai-item')?.value||'')}
   catch(e){msg('Não foi possível carregar os preços de referência: '+(e?.message||'erro'),true)}
  }
  async function selectItem(id){
@@ -328,6 +328,11 @@ runtime = r'''<script>
   const box=document.createElement('div');box.id='ntec-composition-panel';box.className='panel';box.style.cssText='margin:22px 0;padding:16px';
   box.innerHTML='<div class="titleline"><div><h2>Demonstrativo de preços por item</h2><p class="sub">Monte a composição comercial da proposta com a tabela de referência. Ao selecionar um item, a unidade e o preço de referência são preenchidos; você pode ajustar antes de salvar.</p></div><button type="button" class="btn" id="ntec-composition-refresh">Atualizar propostas</button></div>'+
    '<div class="formgrid"><div class="field"><label for="ntec-composition-proposal">Proposta para editar *</label><select id="ntec-composition-proposal"><option value="">Carregando propostas…</option></select><small class="muted small">A composição só pode ser alterada enquanto a proposta estiver em rascunho ou revisão.</small></div><div class="field"><label>Cliente / situação</label><div id="ntec-composition-context" class="ntec-composition-context">Selecione uma proposta.</div></div></div>'+
+   '<div id="ntec-norm-bundle" class="panel" style="margin:16px 0;padding:14px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:10px"><div class="titleline"><div><h3>Montar conjunto completo por norma</h3><p class="sub">Selecione uma NBR para carregar todos os serviços associados. Confira e edite a quantidade e o preço de cada linha, marque somente o que deseja contratar e adicione tudo à proposta de uma vez.</p></div></div>'+
+   '<div class="formgrid"><div class="field"><label for="ntec-norm-bundle-standard">Norma específica *</label><select id="ntec-norm-bundle-standard"><option value="">Carregando normas do catálogo…</option></select></div><div class="field"><label>Resumo do conjunto</label><div id="ntec-norm-bundle-summary" class="ntec-composition-context">Escolha uma norma para ver o conjunto de serviços.</div></div></div>'+
+   '<div id="ntec-norm-bundle-items" class="tablewrap" style="margin-top:12px"><p class="muted small">Os itens associados à norma aparecerão aqui.</p></div>'+
+   '<div class="ntec-ai-actions"><button class="btn primary" id="ntec-norm-bundle-add" type="button" disabled>Adicionar serviços marcados à proposta</button><span id="ntec-norm-bundle-message" role="status" aria-live="polite"></span></div>'+
+   '<p class="footnote">Os preços começam com os valores de referência do catálogo, mas você pode alterá-los individualmente antes de adicionar. Isso altera apenas a composição desta proposta; não modifica automaticamente a tabela oficial de referência. A associação normativa depende do escopo e deve ser conferida antes do envio.</p></div>'+
    '<div id="ntec-norm-package" class="panel" style="margin:16px 0;padding:14px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:10px"><div class="titleline"><div><h3>Modelos de serviço e normas aplicáveis</h3><p class="sub">Escolha o serviço. O portal associa as referências normativas e deixa os itens sugeridos marcados para você revisar antes de adicionar.</p></div></div>'+
    '<div class="formgrid"><div class="field"><label for="ntec-norm-template">Serviço / modelo de proposta</label><select id="ntec-norm-template"><option value="">Selecione o tipo de serviço…</option><option value="concreto_moldagem_axial">Concreto — moldagem + ruptura axial</option><option value="concreto_moldagem">Concreto — somente moldagem</option><option value="concreto_axial">Concreto — somente ruptura axial</option><option value="concreto_diametral">Concreto — ruptura diametral</option><option value="concreto_flexao">Concreto — tração na flexão</option><option value="argamassa_moldagem">Argamassa — moldagem de corpos de prova</option><option value="graute_moldagem_axial">Graute — moldagem + ruptura axial (confirmar método)</option></select></div><div class="field"><label>Normas / referências associadas</label><div id="ntec-norm-refs" class="ntec-composition-context">Selecione um serviço para ver as referências.</div></div></div>'+
    '<div id="ntec-norm-warning" class="ntec-ai-disclaimer" style="margin:10px 0">A norma sugerida é uma referência inicial. Confirme material, geometria do corpo de prova, idade, método de ensaio e escopo contratado antes de emitir a proposta.</div>'+
@@ -351,7 +356,80 @@ runtime = r'''<script>
   $('ntec-composition-save').addEventListener('click',saveComposition);
   $('ntec-norm-template').addEventListener('change',renderNormTemplate);
   $('ntec-norm-add').addEventListener('click',addSelectedNormItems);
+  $('ntec-norm-bundle-standard').addEventListener('change',renderNormBundleItems);
+  $('ntec-norm-bundle-add').addEventListener('click',addNormBundleItems);
+  $('ntec-norm-bundle-items').addEventListener('input',updateNormBundleSummary);
+  $('ntec-norm-bundle-items').addEventListener('change',updateNormBundleSummary);
   return true;
+ }
+ function canonicalNormToken(raw){
+  let token=String(raw||'').trim().toUpperCase().replace(/\\s+/g,' ');
+  if(/^NBR\\b/i.test(token))token='ABNT '+token;
+  return token;
+ }
+ function extractNormTokens(text){
+  const found=String(text||'').match(/(?:ABNT\\s+)?NBR\\s+\\d+(?::\\d{4})?|DNER-PRO\\s+\\d+\\/\\d{2,4}/gi)||[];
+  return [...new Set(found.map(canonicalNormToken))];
+ }
+ function renderNormBundleOptions(){
+  const select=$('ntec-norm-bundle-standard');if(!select)return;
+  const counts=new Map();
+  rows.filter(r=>r.is_active).forEach(r=>extractNormTokens(r.normative_references).forEach(token=>counts.set(token,(counts.get(token)||0)+1)));
+  const options=[...counts.entries()].sort((a,b)=>a[0].localeCompare(b[0],'pt-BR',{numeric:true}));
+  const previous=select.value;
+  select.innerHTML='<option value="">Selecione uma norma…</option>'+options.map(([token,count])=>'<option value="'+esc(token)+'">'+esc(token)+' · '+count+' serviço(s) vinculado(s)'+'</option>').join('');
+  if(options.some(([token])=>token===previous))select.value=previous;
+  else{select.value='';renderNormBundleItems()}
+ }
+ function renderNormBundleItems(){
+  const select=$('ntec-norm-bundle-standard'),box=$('ntec-norm-bundle-items'),button=$('ntec-norm-bundle-add');
+  if(!select||!box||!button)return;
+  const standard=select.value;
+  if(!standard){box.innerHTML='<p class="muted small">Selecione uma NBR para carregar o conjunto completo de serviços do catálogo.</p>';box._ntecBundleRows=[];updateNormBundleSummary();return}
+  const matched=rows.filter(r=>r.is_active&&extractNormTokens(r.normative_references).includes(standard));
+  box._ntecBundleRows=matched;
+  if(!matched.length){box.innerHTML='<p class="muted small">Não há serviços ativos vinculados a esta norma. Confira o cadastro de referências normativas.</p>';updateNormBundleSummary();return}
+  box.innerHTML='<table style="width:100%;min-width:900px;border-collapse:collapse"><thead><tr><th style="padding:8px;text-align:left">Incluir</th><th style="padding:8px;text-align:left">Código / serviço</th><th style="padding:8px;text-align:left">Unidade</th><th style="padding:8px;text-align:right">Preço referência</th><th style="padding:8px;text-align:right">Qtd.</th><th style="padding:8px;text-align:right">Preço proposto (R$)</th><th style="padding:8px;text-align:right">Total (R$)</th></tr></thead><tbody>'+
+  matched.map((r,i)=>'<tr data-ntec-bundle-line="'+i+'" style="border-top:1px solid var(--line)"><td style="padding:8px"><input type="checkbox" data-bundle-check checked aria-label="Incluir '+esc(r.item_name)+'"/></td><td style="padding:8px;min-width:240px"><strong>'+esc((r.item_code?r.item_code+' · ':'')+r.item_name)+'</strong><small style="display:block;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.35">Normas: '+esc(r.normative_references||standard)+'</small>'+(r.normative_note?'<small style="display:block;margin-top:3px;color:var(--muted);font-size:11px">'+esc(r.normative_note)+'</small>':'')+'</td><td style="padding:8px;white-space:nowrap">'+esc(r.unit||'serviço')+'</td><td style="padding:8px;text-align:right;white-space:nowrap">'+(r.price_label?esc(r.price_label)+' · ':'')+money(r.reference_price||0)+'</td><td style="padding:8px"><input data-bundle-qty type="number" min="0.001" step="0.001" value="1" style="width:90px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Quantidade para '+esc(r.item_name)+'"/></td><td style="padding:8px"><input data-bundle-price type="number" min="0" step="0.01" value="'+esc(Number(r.reference_price||0).toFixed(2))+'" style="width:130px;box-sizing:border-box;padding:7px;border:1px solid var(--line);border-radius:6px" aria-label="Preço proposto para '+esc(r.item_name)+'"/></td><td data-bundle-total style="padding:8px;text-align:right;white-space:nowrap">'+money(r.reference_price||0)+'</td></tr>').join('')+
+  '</tbody></table>';
+  updateNormBundleSummary();
+ }
+ function updateNormBundleSummary(){
+  const box=$('ntec-norm-bundle-items'),summary=$('ntec-norm-bundle-summary'),button=$('ntec-norm-bundle-add'),status=$('ntec-norm-bundle-message');
+  if(!box||!summary||!button)return;
+  let count=0,total=0,invalid=false;
+  box.querySelectorAll('tr[data-ntec-bundle-line]').forEach(tr=>{
+   const check=tr.querySelector('[data-bundle-check]'),qty=Number(tr.querySelector('[data-bundle-qty]')?.value),price=Number(tr.querySelector('[data-bundle-price]')?.value);
+   const good=Number.isFinite(qty)&&qty>0&&Number.isFinite(price)&&price>=0;
+   if(check?.checked){count++;if(good)total+=qty*price;else invalid=true}
+   const totalCell=tr.querySelector('[data-bundle-total]');
+   if(totalCell)totalCell.textContent=good?money(qty*price):'—';
+   if(check)check.disabled=!compositionEditable(activeCompositionProposal)||compositionBusy;
+  });
+  const standard=$('ntec-norm-bundle-standard')?.value||'';
+  summary.innerHTML=standard?'<strong>'+esc(standard)+'</strong><br>'+count+' serviço(s) marcado(s) · Total estimado: <strong>'+money(total)+'</strong>'+(invalid?'<br><span style="color:#b42318">Confira quantidade e preço dos itens marcados.</span>':''):'Escolha uma norma para ver o conjunto de serviços.';
+  button.disabled=!compositionEditable(activeCompositionProposal)||compositionBusy||!count||invalid;
+  if(status&&status.dataset.resetAfterChange==='1'){status.textContent='';delete status.dataset.resetAfterChange}
+ }
+ function addNormBundleItems(){
+  const standard=$('ntec-norm-bundle-standard')?.value,box=$('ntec-norm-bundle-items'),status=$('ntec-norm-bundle-message');
+  if(!standard){if(status)status.textContent='Selecione uma NBR primeiro.';return}
+  if(!compositionEditable(activeCompositionProposal)){if(status)status.textContent='Selecione uma proposta em rascunho ou revisão antes de adicionar os serviços.';return}
+  const bundleRows=box?box._ntecBundleRows||[]:[];
+  const existing=new Set(readCompositionItems().map(x=>x.reference_value_id).filter(Boolean));
+  let added=0,skipped=0;
+  for(const tr of box.querySelectorAll('tr[data-ntec-bundle-line]')){
+   const check=tr.querySelector('[data-bundle-check]');if(!check?.checked)continue;
+   const ref=bundleRows[Number(tr.dataset.ntecBundleLine)];if(!ref)continue;
+   if(existing.has(String(ref.id))){skipped++;continue}
+   const qty=Number(tr.querySelector('[data-bundle-qty]')?.value),price=Number(tr.querySelector('[data-bundle-price]')?.value);
+   if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0){if(status)status.textContent='Revise quantidade e preço de todos os serviços marcados.';return}
+   const description=standard+' — '+ref.item_name;
+   addCompositionLine({description,quantity:qty,unit:ref.unit||'serviço',unit_price:price,discount_percent:0,reference_value_id:ref.id,normative_references:ref.normative_references||standard,normative_note:ref.normative_note||('Adicionado pelo conjunto da norma '+standard+'. Confirme o escopo antes de enviar.')});
+   existing.add(String(ref.id));added++;
+  }
+  compositionDirty=compositionDirty||added>0;updateCompositionTotals();updateNormBundleSummary();
+  if(status)status.textContent=added?(added+' serviço(s) de '+standard+' adicionado(s) à proposta. Confira a composição e salve quando estiver pronta.'+(skipped?' '+skipped+' repetido(s) ignorado(s).':'')):'Nenhum serviço novo foi adicionado. Marque um item que ainda não esteja na proposta.';
  }
  const normTemplates={
   concreto_moldagem_axial:{
@@ -533,7 +611,7 @@ runtime = r'''<script>
   try{
    const previous=desiredId||activeCompositionProposal?.id||$('ntec-composition-proposal')?.value||'';
    compositionProposals=await api().loadProposalPricing();
-   if(api()?.loadProposalReferenceValues){window.NTEC_PRICE_REFERENCE_CACHE=await api().loadProposalReferenceValues()}
+   if(api()?.loadProposalReferenceValues){window.NTEC_PRICE_REFERENCE_CACHE=await api().loadProposalReferenceValues();rows=window.NTEC_PRICE_REFERENCE_CACHE;renderOptions(selected?.id);renderNormBundleOptions()}
    const select=$('ntec-composition-proposal');
    select.innerHTML=compositionProposals.length?compositionProposals.map(p=>'<option value="'+esc(p.id)+'" '+(compositionEditable(p)?'':'disabled')+'>'+esc(p.proposal_number||'Proposta')+' · '+esc(p.clients?.company_name||'Cliente')+' · '+esc(p.status)+'</option>').join(''):'<option value="">Nenhuma proposta cadastrada</option>';
    let choice=compositionProposals.find(p=>String(p.id)===String(previous))||compositionProposals.find(compositionEditable)||compositionProposals[0]||null;
