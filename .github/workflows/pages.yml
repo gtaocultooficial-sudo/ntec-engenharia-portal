@@ -11,6 +11,8 @@ on:
       - 'apply_ntec_rupture_workflow.py'
       - 'apply_ntec_moldagem_ocr.py'
       - 'apply_ntec_programming.py'
+      - 'apply_ntec_price_assistant.py'
+      - 'supabase/migrations/20261028_proposal_price_reviews.sql'
   workflow_dispatch:
 
 permissions:
@@ -57,6 +59,7 @@ jobs:
           python3 apply_ntec_rupture_workflow.py _site/admin/index.html
           python3 apply_ntec_pdf_layout.py _site/admin/index.html
           python3 apply_ntec_programming.py _site/admin/index.html
+          python3 apply_ntec_price_assistant.py _site/admin/index.html
           grep -q "updateReportTitleAuto" _site/admin/index.html
           grep -q "ntecRecalc" _site/admin/index.html
           grep -q "ntecGenerateNarrative" _site/admin/index.html
@@ -75,6 +78,9 @@ jobs:
           grep -q "saveProgrammingItem" _site/admin/index.html
           grep -q "page-programacao" _site/admin/index.html
           grep -q "programming_items" _site/admin/index.html
+          grep -q "ntec-price-ai-panel" _site/admin/index.html
+          grep -q "loadProposalPriceReviews" _site/admin/index.html
+          grep -q "ntec-price-autocomplete" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
