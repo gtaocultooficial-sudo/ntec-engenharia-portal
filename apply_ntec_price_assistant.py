@@ -14,7 +14,15 @@ def once(old, new, label):
         raise SystemExit(f"{label}: esperado 1 trecho, encontrados {count}")
     s = s.replace(old, new, 1)
 
-api_methods = r"""async loadProposalPriceReviews(referenceValueId){
+api_methods = r"""async requestProposalPriceAI(payload){
+ if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
+ const {data,error}=await supabase.functions.invoke('ntec-price-ai',{body:payload});
+ if(error)throw new Error(error.message||'Falha ao chamar a IA de precificação.');
+ if(data?.error)throw new Error(data.error+(data.detail?' — '+data.detail:''));
+ if(!data?.estimate)throw new Error('A IA não retornou uma estimativa utilizável.');
+ return data.estimate;
+},
+async loadProposalPriceReviews(referenceValueId){
  if(!currentSession||currentProfile?.role!=='admin')throw new Error('Acesso administrativo necessário.');
  let query=supabase.from('proposal_price_reviews').select('id,reference_value_id,reviewed_by,item_name,item_code,category,unit,base_price,recommended_price,market_price_min,market_price_max,annual_adjustment_percent,band_percent,index_name,index_period,years_elapsed,assessment,notes,applied_to_reference,applied_at,created_at').order('created_at',{ascending:false}).limit(100);
  if(referenceValueId)query=query.eq('reference_value_id',referenceValueId);
@@ -81,7 +89,7 @@ runtime = r'''<script>
    '<div class="field"><label for="ntec-ai-index">Índice anual de reajuste</label><select id="ntec-ai-index"><option value="INCC-M" data-rate="6.75" data-period="out/2026" data-url="https://portal.fgv.br/noticias/incc-m-outubro-2026">INCC-M · 6,75% · out/2026 (FGV)</option><option value="IPCA" data-rate="4.58" data-period="set/2026" data-url="https://www.ibge.gov.br/indicadores/inflacao">IPCA · 4,58% · set/2026 (IBGE)</option><option value="personalizado" data-rate="" data-period="informado pelo administrador" data-url="">Personalizado — informar percentual</option></select></div>'+
    '<div class="field"><label for="ntec-ai-rate">Percentual anual (%) *</label><input id="ntec-ai-rate" type="number" min="-20" max="100" step="0.01" value="6.75" required/><small class="muted small">INCC-M é um ponto de partida para custos de construção; avalie se o índice é adequado ao serviço.</small></div>'+
    '<div class="field"><label for="ntec-ai-band">Margem da faixa (%)</label><input id="ntec-ai-band" type="number" min="0" max="50" step="0.5" value="10" required/><small class="muted small">Ex.: 10% abaixo e acima do preço projetado.</small></div></div>'+
-   '<div class="ntec-ai-actions"><button class="btn primary" id="ntec-ai-estimate" type="button">Estimar reajuste e comparar</button><button class="btn" id="ntec-ai-save" type="button" disabled>Salvar revisão anual</button><button class="btn hidden" id="ntec-ai-apply" type="button">Aplicar preço recomendado à tabela</button><span id="ntec-ai-message" role="status" aria-live="polite"></span></div>'+
+   '<div class="ntec-ai-actions"><button class="btn primary" id="ntec-ai-estimate" type="button">Estimar reajuste e comparar</button><button class="btn" id="ntec-ai-real-estimate" type="button">Pesquisar mercado com IA</button><button class="btn" id="ntec-ai-save" type="button" disabled>Salvar revisão anual</button><button class="btn hidden" id="ntec-ai-apply" type="button">Aplicar preço recomendado à tabela</button><span id="ntec-ai-message" role="status" aria-live="polite"></span></div>'+
    '<div id="ntec-ai-result" class="ntec-ai-result"><p>Selecione um item para revisar. A tabela original só será alterada após você salvar e aplicar uma recomendação.</p></div>'+
    '<div class="ntec-ai-history"><h4>Histórico de revisões do item</h4><div id="ntec-ai-history-body" class="muted small">Selecione um item para consultar as revisões anteriores.</div></div>'+
    '<p class="footnote">Índices de partida verificados em 28/10/2026: <a href="https://portal.fgv.br/noticias/incc-m-outubro-2026" target="_blank" rel="noopener">INCC-M FGV — 6,75% acumulado em 12 meses (out/2026)</a> e <a href="https://www.ibge.gov.br/indicadores/inflacao" target="_blank" rel="noopener">IPCA IBGE — 4,58% acumulado em 12 meses (set/2026)</a>. Atualize o percentual quando sair uma nova divulgação e valide se o índice representa seus custos.</p>';
@@ -93,6 +101,7 @@ runtime = r'''<script>
   $('ntec-ai-index').addEventListener('change',syncIndexRate);
   $('ntec-ai-item').addEventListener('change',()=>selectItem($('ntec-ai-item').value));
   $('ntec-ai-estimate').addEventListener('click',estimate);
+  $('ntec-ai-real-estimate').addEventListener('click',requestAiEstimate);
   $('ntec-ai-save').addEventListener('click',saveReview);
   $('ntec-ai-apply').addEventListener('click',applyReview);
   return true;
@@ -173,6 +182,37 @@ runtime = r'''<script>
    '<p><strong>Critério:</strong> '+esc(indexName)+' — '+esc(period)+', aplicado por '+years.toLocaleString('pt-BR',{maximumFractionDigits:2})+' ano(s); margem ±'+band.toLocaleString('pt-BR')+'%.</p><p class="muted small">'+esc(notes)+'</p>';
   $('ntec-ai-save').disabled=false;$('ntec-ai-apply').classList.add('hidden');lastSavedReview=null;
   msg('Estimativa pronta. Revise os pressupostos e salve para manter o histórico.');
+ }
+ async function requestAiEstimate(){
+  if(busy||!selected)return;
+  const button=$('ntec-ai-real-estimate');busy=true;button.disabled=true;button.textContent='Pesquisando…';msg('Consultando a IA e pesquisando referências públicas de mercado. Isso pode levar alguns instantes…');
+  try{
+   const result=await api().requestProposalPriceAI({item_name:selected.item_name,item_code:selected.item_code,category:selected.category,unit:selected.unit,current_price:Number(selected.reference_price||0),price_label:selected.price_label||'',notes:selected.notes||''});
+   if(!result||!Number.isFinite(Number(result.recommended_price))||!Number.isFinite(Number(result.market_price_min))||!Number.isFinite(Number(result.market_price_max)))throw new Error('A IA retornou valores inválidos.');
+   const min=Number(result.market_price_min),max=Number(result.market_price_max),recommended=Number(result.recommended_price);
+   const current=Number(selected.reference_price||0),assessment=result.assessment|| (current<min?'abaixo':current>max?'acima':'na_faixa');
+   const sources=Array.isArray(result.sources)?result.sources:[];
+   const factors=Array.isArray(result.cost_factors)?result.cost_factors:[];
+   const noteLines=['Análise de mercado assistida por IA com pesquisa web.','Data da análise: '+(result.data_as_of||new Date().toISOString().slice(0,10)), 'Modelo: '+(result.model||'não informado'),'Confiança: '+(result.confidence||'não informada'),'Racional: '+(result.rationale||'não informado'), 'Fatores de custo: '+(factors.join('; ')||'não informados'), 'Fontes consultadas: '+(sources.map(x=>(x.title||x.url)+' — '+x.url+(x.summary?' — '+x.summary:'')).join(' | ')||'Nenhuma fonte listada pela IA'),'Aviso: estimativa indicativa; confira escopo, unidade, impostos, deslocamento, equipamento, equipe e margem antes de aplicar.'];
+   const years=1;
+   const band=Math.max(0,Math.min(50,Math.round((Math.max(recommended-min,max-recommended)/Math.max(recommended,1))*1000)/10));
+   lastEstimate={reference_value_id:selected.id,item_name:selected.item_name,item_code:selected.item_code,category:selected.category,unit:selected.unit,base_price:current,recommended_price:Math.round(recommended*100)/100,market_price_min:Math.round(min*100)/100,market_price_max:Math.round(max*100)/100,annual_adjustment_percent:Number(result.annual_adjustment_percent),band_percent:band,index_name:'IA OpenAI + pesquisa web',index_period:result.data_as_of||new Date().toISOString().slice(0,10),years_elapsed:years,assessment,notes:noteLines.join('\n')};
+   lastSavedReview=null;$('ntec-ai-save').disabled=false;$('ntec-ai-apply').classList.add('hidden');
+   const label=assessment==='abaixo'?'Preço atual abaixo da faixa estimada':assessment==='acima'?'Preço atual acima da faixa estimada':assessment==='sem_preco_numerico'?'Sem preço numérico comparável':'Preço atual dentro da faixa estimada';
+   const css=assessment==='abaixo'?'bad':assessment==='na_faixa'?'good':'';
+   const sourceHtml=sources.length?sources.map(source=>'<li><a href="'+esc(source.url)+'" target="_blank" rel="noopener">'+esc(source.title||source.url)+'</a>'+(source.summary?'<div class="muted small">'+esc(source.summary)+'</div>':'')+'</li>').join(''):'<li>Nenhuma fonte verificável retornada. Use a estimativa apenas como triagem e confira os preços manualmente.</li>';
+   $('ntec-ai-result').innerHTML='<div><span class="ntec-ai-status '+css+'">'+esc(label)+'</span> <span class="ntec-ai-tag">Confiança: '+esc(result.confidence||'não informada')+'</span></div><div class="metrics">'+
+   '<div class="metric"><span>Preço atual NTEC</span><strong>'+money(current)+'</strong></div>'+
+   '<div class="metric"><span>Recomendação da IA</span><strong>'+money(recommended)+'</strong></div>'+
+   '<div class="metric"><span>Faixa estimada</span><strong>'+money(min)+' – '+money(max)+'</strong></div>'+
+   '<div class="metric"><span>Reajuste anual sugerido</span><strong>'+Number(result.annual_adjustment_percent).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%</strong></div></div>'+
+   '<p><strong>Justificativa:</strong> '+esc(result.rationale||'Sem justificativa retornada.')+'</p>'+
+   (factors.length?'<p><strong>Fatores de custo a validar:</strong> '+esc(factors.join('; '))+'</p>':'')+
+   '<p><strong>Fontes da pesquisa:</strong></p><ul>'+sourceHtml+'</ul>'+
+   '<p class="muted small">Estimativa de apoio à decisão, não cotação garantida. O preço oficial só muda após salvar a revisão e clicar em “Aplicar preço recomendado à tabela”.</p>';
+   msg('Análise de IA pronta. Revise as fontes e salve a revisão para manter o histórico.');
+  }catch(e){msg('Não foi possível obter a análise da IA: '+(e?.message||'erro desconhecido'),true)}
+  finally{busy=false;button.disabled=false;button.textContent='Pesquisar mercado com IA'}
  }
  async function saveReview(){
   if(busy||!lastEstimate)return;
