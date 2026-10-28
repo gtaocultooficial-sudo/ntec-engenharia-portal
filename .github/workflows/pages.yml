@@ -81,6 +81,10 @@ jobs:
           grep -q "ntec-price-ai-panel" _site/admin/index.html
           grep -q "loadProposalPriceReviews" _site/admin/index.html
           grep -q "ntec-price-autocomplete" _site/admin/index.html
+          grep -q "ntec-composition-panel" _site/admin/index.html
+          grep -q "Demonstrativo de preços por item" _site/admin/index.html
+          grep -q "Revisão anual" _site/admin/index.html
+          grep -q "reference_value_id" _site/admin/index.html
           # Parse every inline JS block after patching; fail before publishing if syntax is invalid.
           python3 - <<'PY'
           from html.parser import HTMLParser
