@@ -61,10 +61,24 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
   if (profileError || profile?.role !== "admin") return json({ error: "Somente o administrador da NTEC pode solicitar estimativas." }, 403);
 
-  const openAiKey = Deno.env.get("OPENAI_API_KEY");
+  // Robust secret lookup: some runtimes can expose an environment name with
+  // invisible surrounding whitespace. Never log secret values or full env objects.
+  const envVars = Deno.env.toObject();
+  const matchingOpenAiEnvName = Object.keys(envVars).find((name) => name.trim() === "OPENAI_API_KEY");
+  const directOpenAiKey = (Deno.env.get("OPENAI_API_KEY") || "").trim();
+  const openAiKey = directOpenAiKey || String(
+    matchingOpenAiEnvName ? envVars[matchingOpenAiEnvName] || "" : ""
+  ).trim();
+  // Safe diagnostics: presence only, and whether the name needed normalization.
+  console.log(
+    "[ntec-price-ai] OPENAI_API_KEY configured:",
+    Boolean(openAiKey),
+    "normalized env-name match:",
+    Boolean(matchingOpenAiEnvName && matchingOpenAiEnvName !== "OPENAI_API_KEY")
+  );
   if (!openAiKey) {
     return json({
-      error: "A função de IA está instalada, mas falta configurar OPENAI_API_KEY nos Secrets das Edge Functions do Supabase. O estimador por índice continua disponível.",
+      error: "O Supabase ainda não disponibilizou OPENAI_API_KEY para esta execução. Confirme o segredo salvo no projeto ywxqdcepqqsrpnymrcli e aguarde alguns segundos; a função foi reiniciada para recarregar a configuração.",
       code: "OPENAI_API_KEY_MISSING",
     }, 503);
   }
